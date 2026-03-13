@@ -14,6 +14,7 @@ def generate_tool_page(tool_name):
     prompt = f"""
     Create a professional Next.js React component for a tool called '{tool_name}'.
     Use Tailwind CSS for a modern, dark-themed UI.
+    Ensure the code is strictly TypeScript-safe with proper interfaces.
     Return ONLY the code. No markdown formatting, no ```tsx. Just the code.
     The tool must be fully interactive (use React hooks).
     Include a 'Copy to Clipboard' button if it's a generator.

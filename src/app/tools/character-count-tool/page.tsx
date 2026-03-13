@@ -159,12 +159,12 @@ const CharacterCounter = () => {
   );
 };
 
-type StatCardProps = {
+interface StatCardProps {
   icon: React.ReactNode;
   label: string;
   value: string | number;
-  subValue?: string | null;
-};
+  subValue?: string; // The '?' makes it optional
+}
 
 const StatCard = ({ icon, label, value, subValue }: StatCardProps) => (
   <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl hover:border-neutral-700 transition-all duration-300 group">
