@@ -30,13 +30,13 @@ def generate_tool_page(tool_name):
     
     # 3. SAVE THE FILE
     slug = tool_name.lower().replace(" ", "-")
-    path = f"app/tools/{slug}"
+    path = f"src/app/tools/{slug}"
     os.makedirs(path, exist_ok=True)
     
     with open(f"{path}/page.tsx", "w", encoding="utf-8") as f:
         f.write("'use client';\n\n" + clean_code)
-    
-    print(f"✅ Success! File created at app/tools/{slug}/page.tsx")
+
+    print(f"✅ Success! File created at src/app/tools/{slug}/page.tsx")
 
 # Tools to build
 tools = [
