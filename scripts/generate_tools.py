@@ -5,7 +5,7 @@ from google import genai
 
 # This allows the script to work locally (using your key) 
 # and on GitHub (using the Secret we set up).
-API_KEY = os.environ.get("GEMINI_API_KEY") or "AIzaSyC5MWIupm1krl0z9qVT4fRRgrtdx6TdSds"
+API_KEY = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=API_KEY)
 
 def generate_tool_page(tool_name):
