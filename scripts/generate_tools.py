@@ -3,7 +3,8 @@ from google import genai
 
 # 1. SETUP THE CLIENT
 # Replace with your key from AI Studio
-API_KEY = "AIzaSyC5MWIupm1krl0z9qVT4fRRgrtdx6TdSds" 
+import os
+API_KEY = os.environ.get("GEMINI_API_KEY") or "AIzaSyC5MWIupm1krl0z9qVT4fRRgrtdx6TdSds"
 client = genai.Client(api_key=API_KEY)
 
 def generate_tool_page(tool_name):
