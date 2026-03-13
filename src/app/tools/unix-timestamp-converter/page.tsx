@@ -17,7 +17,7 @@ const UnixTimestampConverter = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const handleTimestampChange = (val) => {
+  const handleTimestampChange = (val: string) => {
     setTimestamp(val);
     const date = new Date(parseInt(val) * 1000);
     if (!isNaN(date.getTime())) {
@@ -25,7 +25,7 @@ const UnixTimestampConverter = () => {
     }
   };
 
-  const handleDateChange = (val) => {
+  const handleDateChange = (val: string) => {
     setDateInput(val);
     const date = new Date(val);
     if (!isNaN(date.getTime())) {
@@ -33,13 +33,13 @@ const UnixTimestampConverter = () => {
     }
   };
 
-  const copyToClipboard = (text, label) => {
+  const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopyFeedback(label);
     setTimeout(() => setCopyFeedback(""), 2000);
   };
 
-  const formatDate = (ts) => {
+  const formatDate = (ts: string): { local: string; utc: string; relative: string } | "Invalid Date" => {
     const d = new Date(parseInt(ts) * 1000);
     if (isNaN(d.getTime())) return "Invalid Date";
     return {
@@ -49,7 +49,7 @@ const UnixTimestampConverter = () => {
     };
   };
 
-  const getRelativeTime = (date) => {
+  const getRelativeTime = (date: Date): string => {
     const diff = (date.getTime() - Date.now()) / 1000;
     const absDiff = Math.abs(diff);
     if (absDiff < 60) return `${Math.floor(absDiff)}s ${diff > 0 ? 'from now' : 'ago'}`;
@@ -129,7 +129,7 @@ const UnixTimestampConverter = () => {
                 <div className="md:col-span-2 bg-slate-950/50 border border-slate-800 rounded-xl p-4 flex flex-col justify-center">
                    <div className="flex justify-between items-center px-2">
                       <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Relative</span>
-                      <span className="text-sm font-medium text-emerald-400">{results.relative}</span>
+                      <span className="text-sm font-medium text-emerald-400">{results !== "Invalid Date" ? results.relative : "Invalid Date"}</span>
                    </div>
                 </div>
               </div>
@@ -143,11 +143,11 @@ const UnixTimestampConverter = () => {
                   <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                   Local Time
                 </h3>
-                <button onClick={() => copyToClipboard(results.local, 'local')} className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={() => copyToClipboard(results !== "Invalid Date" ? results.local : '', 'local')} className="text-slate-500 hover:text-white transition-colors">
                   {copyFeedback === 'local' ? <span className="text-xs text-emerald-400 font-normal">Copied!</span> : <CopyIcon />}
                 </button>
               </div>
-              <p className="text-lg font-mono text-slate-100 break-words">{results.local}</p>
+              <p className="text-lg font-mono text-slate-100 break-words">{results !== "Invalid Date" ? results.local : "Invalid Date"}</p>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-slate-700 transition-colors">
@@ -156,11 +156,11 @@ const UnixTimestampConverter = () => {
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                   UTC Time
                 </h3>
-                <button onClick={() => copyToClipboard(results.utc, 'utc')} className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={() => copyToClipboard(results !== "Invalid Date" ? results.utc : '', 'utc')} className="text-slate-500 hover:text-white transition-colors">
                   {copyFeedback === 'utc' ? <span className="text-xs text-emerald-400 font-normal">Copied!</span> : <CopyIcon />}
                 </button>
               </div>
-              <p className="text-lg font-mono text-slate-100 break-words">{results.utc}</p>
+              <p className="text-lg font-mono text-slate-100 break-words">{results !== "Invalid Date" ? results.utc : "Invalid Date"}</p>
             </div>
           </div>
 

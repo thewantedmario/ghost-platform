@@ -15,7 +15,7 @@ const SecurePasswordGenerator = () => {
     symbols: true,
   });
   const [copied, setCopied] = useState(false);
-  const [strength, setStrength] = useState({ score: 0, label: '', color: '' });
+  const [strength, setStrength] = useState<{ score: number; label: string; color: string; icon?: React.ReactNode }>({ score: 0, label: '', color: '', icon: undefined });
 
   const generatePassword = useCallback(() => {
     const charset = {
@@ -135,7 +135,7 @@ const SecurePasswordGenerator = () => {
                 ))}
               </div>
               <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider min-w-[100px] justify-end">
-                <span style={{ color: strength.color.replace('bg-', 'text-') }}>{strength.icon}</span>
+                {strength.icon && <span style={{ color: strength.color.replace('bg-', 'text-') }}>{strength.icon}</span>}
                 <span className="text-slate-400">{strength.label}</span>
               </div>
             </div>

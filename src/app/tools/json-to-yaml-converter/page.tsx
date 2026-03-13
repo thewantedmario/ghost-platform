@@ -6,11 +6,11 @@ import { Copy, Check, Trash2, FileJson, FileCode, AlertCircle, ArrowRightLeft } 
 const JsonToYamlConverter = () => {
   const [jsonInput, setJsonInput] = useState('{\n  "project": "Modern UI Tool",\n  "version": "1.0.0",\n  "features": [\n    "Fast",\n    "Secure",\n    "Elegant"\n  ],\n  "author": {\n    "name": "Design Studio",\n    "role": "Developer"\n  }\n}');
   const [yamlOutput, setYamlOutput] = useState('');
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Simplified robust YAML stringifier to keep component dependency-free
-  const stringifyYaml = useCallback((obj, indent = 0) => {
+  const stringifyYaml = useCallback((obj: any, indent: number = 0): string => {
     const spaces = '  '.repeat(indent);
     if (obj === null) return 'null';
     if (typeof obj !== 'object') {
@@ -51,7 +51,7 @@ const JsonToYamlConverter = () => {
       setYamlOutput(yaml);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
       setYamlOutput('');
     }
   }, [jsonInput, stringifyYaml]);
