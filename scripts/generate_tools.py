@@ -1,10 +1,8 @@
-# 1. SETUP THE CLIENT
-# Replace with your key from AI Studio
 import os
 from google import genai
 
-# This allows the script to work locally (using your key) 
-# and on GitHub (using the Secret we set up).
+# 1. SETUP THE CLIENT
+# This uses your key locally OR the GitHub Secret automatically
 API_KEY = os.environ.get("GEMINI_API_KEY") or "AIzaSyBsvF_4rJy8rMMklwiJDClfXOKeG6iHVSg"
 client = genai.Client(api_key=API_KEY)
 
@@ -21,7 +19,7 @@ def generate_tool_page(tool_name):
     Make it look premium and high-end.
     """
     
-    # 2. CALL THE MODERN MODEL
+    # 2. CALL THE MODERN MODEL (Using Gemini 3 Flash)
     response = client.models.generate_content(
         model='gemini-3-flash-preview',
         contents=prompt
@@ -36,22 +34,18 @@ def generate_tool_page(tool_name):
     path = f"src/app/tools/{slug}"
     os.makedirs(path, exist_ok=True)
     
+    # Added encoding="utf-8" to match your Trend-Spotter fix
     with open(f"{path}/page.tsx", "w", encoding="utf-8") as f:
         f.write("'use client';\n\n" + clean_code)
 
     print(f"✅ Success! File created at src/app/tools/{slug}/page.tsx")
 
-# Tools to build
-tools = [
-    "Secure Password Generator",
-    "JSON to YAML Converter",
-    "Character Count Tool",
-    "Unix Timestamp Converter",
-    "Unit Converter"
-]
+# IMPORTANT: The Trend-Spotter rewrites this specific line below
+tools_to_generate = ['JWT Debugger', 'SQL Minifier', 'Crontab Generator', 'SVG to Data URI', 'Base64 Image Decoder']
 
 if __name__ == "__main__": 
-    for tool in tools:
+    # Use the tools_to_generate list specifically
+    for tool in tools_to_generate:
         try:
             generate_tool_page(tool)
         except Exception as e:
