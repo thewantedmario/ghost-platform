@@ -44,6 +44,13 @@ export default function RootLayout({
           <div id="container-b1aff45fccdd6bc09be1b32e952be658"></div>
         </div>
 
+        {/* Anti-Adblock Script */}
+        <Script
+          id="anti-adblock"
+          src="https://consumptionbackwardsentiments.com/d5dgb1bgh9?key=97d89abdf80b7985920a49464570fb68"
+          strategy="afterInteractive"
+        />
+
         <main>{children}</main>
 
         {/* BOTTOM AD SLOT - Adsterra 728x90 Banner */}
