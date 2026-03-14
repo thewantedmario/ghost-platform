@@ -1,20 +1,20 @@
 name: Ghost Worker - Auto Tool Generator
-permissions:
-  contents: write
-  pages: write
-  id-token: write
 
 on:
   schedule:
-    # This runs every Sunday at 00:00 (Midnight)
-    - cron: '0 0 * * 0'
-  workflow_dispatch: # This allows you to run it manually for testing
+    - cron: '0 0 * * 0' # Runs every Sunday at Midnight
+  workflow_dispatch:      # Allows you to click "Run" manually
+
+permissions:
+  contents: write         # CRITICAL: Allows the robot to save tools & homepage
+  pages: write            # CRITICAL: Allows the robot to push changes to GitHub Pages
+  id-token: write         # CRITICAL: Allows the robot to use the GitHub API
 
 jobs:
-  generate-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -22,21 +22,24 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install AI Library
-        run: pip install google-genai
+      - name: Install Dependencies
+        run: pip install google-genai requests
 
-      - name: Run Full Automation Pipeline
+      - name: 1. Research Trends (Scrapingdog)
+        run: python scripts/trend_analyzer.py
+
+      - name: 2. Generate Tool Pages (Gemini)
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          python scripts/trend_analyzer.py
-          python scripts/generate_tools.py
-          python scripts/update_homepage.py
+        run: python scripts/generate_tools.py
 
-      - name: Commit and Push Changes
+      - name: 3. Update Homepage Grid
+        run: python scripts/update_homepage.py
+
+      - name: 4. Push Changes to Live Site
         run: |
           git config --global user.name "GhostWorker"
           git config --global user.email "action@github.com"
           git add .
-          git commit -m "Auto-generated new tools [skip ci]" || echo "No changes to commit"
+          git commit -m "Sunday Auto-Update: New tools & updated homepage [skip ci]" || echo "No changes"
           git push
