@@ -25,12 +25,13 @@ jobs:
       - name: Install AI Library
         run: pip install google-genai
 
-      - name: Run Auto-Research and Generation
+      - name: Run Full Automation Pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python scripts/trend_analyzer.py
           python scripts/generate_tools.py
+          python scripts/update_homepage.py
 
       - name: Commit and Push Changes
         run: |

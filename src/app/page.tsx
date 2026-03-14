@@ -1,29 +1,69 @@
-export default function Home() {
-  const tools = [
-    { name: "Secure Password Generator", path: "/tools/secure-password-generator", desc: "Generate unhackable passwords instantly." },
-    { name: "JSON to YAML Converter", path: "/tools/json-to-yaml-converter", desc: "Convert data formats for developers." },
-    { name: "Character Count Tool", path: "/tools/character-count-tool", desc: "Perfect for social media and SEO writing." },
-    { name: "Unix Timestamp Converter", path: "/tools/unix-timestamp-converter", desc: "Convert epoch time to human-readable dates." },
-    { name: "Unit Converter", path: "/tools/unit-converter", desc: "Convert between length, weight, temperature, and more." }
-  ];
 
+import React from 'react';
+
+export default function HomePage() {
   return (
-    <main className="min-h-screen bg-black text-white p-8 md:p-24 font-sans">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-5xl font-extrabold mb-4 bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
-          GhostTools
-        </h1>
-        <p className="text-zinc-400 mb-12 text-lg">Automated technical utilities for the modern web.</p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {tools.map((tool) => (
-            <a key={tool.path} href={tool.path} className="group p-6 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all bg-zinc-900/50">
-              <h2 className="text-xl font-bold mb-2 group-hover:text-blue-400">{tool.name} &rarr;</h2>
-              <p className="text-zinc-500 text-sm">{tool.desc}</p>
-            </a>
-          ))}
+    <div className="min-h-screen bg-black text-white font-sans">
+      <div className="max-w-6xl mx-auto px-6 py-20">
+        <header className="mb-16 text-center">
+          <h1 className="text-6xl font-extrabold mb-4 tracking-tighter">GHOST PLATFORM</h1>
+          <p className="text-zinc-500 text-xl">The 2026 Ultimate Developer Utility Hub. Automated. Fast. Free.</p>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+        <a href="/tools/base64-image-decoder" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Base64 Image Decoder</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/character-count-tool" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Character Count Tool</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/crontab-generator" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Crontab Generator</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/json-to-yaml-converter" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Json To Yaml Converter</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/jwt-debugger" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Jwt Debugger</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/secure-password-generator" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Secure Password Generator</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/sql-minifier" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Sql Minifier</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/svg-to-data-uri" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Svg To Data Uri</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/unit-converter" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Unit Converter</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
+        <a href="/tools/unix-timestamp-converter" className="group block p-6 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-blue-500 transition-all">
+          <h3 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400">Unix Timestamp Converter</h3>
+          <p className="text-zinc-400 text-sm">Professional web utility for developers and creators.</p>
+          <span className="mt-4 inline-block text-xs font-semibold text-blue-500 uppercase tracking-wider">Open Tool →</span>
+        </a>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
