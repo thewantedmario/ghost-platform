@@ -1,5 +1,9 @@
 name: Ghost Worker - Auto Tool Generator
-
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  
 on:
   schedule:
     # This runs every Sunday at 00:00 (Midnight)
