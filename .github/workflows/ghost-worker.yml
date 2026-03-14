@@ -3,7 +3,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
-  
+
 on:
   schedule:
     # This runs every Sunday at 00:00 (Midnight)
@@ -25,10 +25,12 @@ jobs:
       - name: Install AI Library
         run: pip install google-genai
 
-      - name: Run Tool Generator
+      - name: Run Auto-Research and Generation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python scripts/generate_tools.py
+        run: |
+          python scripts/trend_analyzer.py
+          python scripts/generate_tools.py
 
       - name: Commit and Push Changes
         run: |
