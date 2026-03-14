@@ -1,0 +1,35 @@
+name: Ghost Worker - Auto Tool Generator
+
+on:
+  schedule:
+    # This runs every Sunday at 00:00 (Midnight)
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # This allows you to run it manually for testing
+
+jobs:
+  generate-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install AI Library
+        run: pip install google-genai
+
+      - name: Run Tool Generator
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/generate_tools.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GhostWorker"
+          git config --global user.email "action@github.com"
+          git add .
+          git commit -m "Auto-generated new tools [skip ci]" || echo "No changes to commit"
+          git push
