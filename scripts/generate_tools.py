@@ -5,7 +5,7 @@ from google import genai
 
 # This allows the script to work locally (using your key) 
 # and on GitHub (using the Secret we set up).
-API_KEY = os.environ.get("GEMINI_API_KEY")
+API_KEY = os.environ.get("GEMINI_API_KEY") or "AIzaSyBsvF_4rJy8rMMklwiJDClfXOKeG6iHVSg"
 client = genai.Client(api_key=API_KEY)
 
 def generate_tool_page(tool_name):
@@ -50,7 +50,7 @@ tools = [
     "Unit Converter"
 ]
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     for tool in tools:
         try:
             generate_tool_page(tool)

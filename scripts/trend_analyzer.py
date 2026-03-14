@@ -44,14 +44,14 @@ def update_generator():
     if to_build:
         print(f"✨ Found {len(to_build)} fresh tools to build!")
         
-        with open("scripts/generate_tools.py", "r") as f:
+        with open("scripts/generate_tools.py", "r", encoding="utf-8") as f:
             content = f.read()
         
         # Update the list in the other script
         new_list_str = f"tools_to_generate = {to_build[:5]}"
         updated_content = re.sub(r"tools_to_generate = \[.*?\]", new_list_str, content)
         
-        with open("scripts/generate_tools.py", "w") as f:
+        with open("scripts/generate_tools.py", "w", encoding="utf-8") as f:
             f.write(updated_content)
     else:
         print("✅ Your platform is already a trendsetter! No new tools needed.")

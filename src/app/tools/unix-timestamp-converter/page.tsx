@@ -1,262 +1,222 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, Copy, RefreshCw, Calendar, ArrowRightLeft, CheckCircle2 } from 'lucide-react';
+"use client";
 
-interface ConversionResult {
-  gmt: string;
+import React, { useState, useEffect, useCallback } from 'react';
+import { Clock, Calendar, Copy, Check, RefreshCw, ArrowRightLeft, AlertCircle } from 'lucide-react';
+
+interface TimeData {
+  unix: number;
+  utc: string;
   local: string;
   relative: string;
+  iso: string;
 }
 
 const UnixTimestampConverter: React.FC = () => {
-  const [timestamp, setTimestamp] = useState<string>(Math.floor(Date.now() / 1000).toString());
-  const [isMilliseconds, setIsMilliseconds] = useState<boolean>(false);
-  const [dateInput, setDateInput] = useState<string>(new Date().toISOString().slice(0, 16));
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [inputValue, setInputValue] = useState<string>(Math.floor(Date.now() / 1000).toString());
+  const [timeData, setTimeData] = useState<TimeData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Update current time clock
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+  const getRelativeTime = (timestamp: number): string => {
+    const ms = timestamp * 1000;
+    const now = Date.now();
+    const diff = now - ms;
+    const seconds = Math.floor(Math.abs(diff) / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    const suffix = diff > 0 ? 'ago' : 'from now';
+
+    if (seconds < 60) return `${seconds}s ${suffix}`;
+    if (minutes < 60) return `${minutes}m ${suffix}`;
+    if (hours < 24) return `${hours}h ${suffix}`;
+    return `${days}d ${suffix}`;
+  };
+
+  const convertValue = useCallback((val: string) => {
+    try {
+      setError(null);
+      let date: Date;
+
+      // Check if numeric (timestamp)
+      if (/^\d+$/.test(val)) {
+        const num = parseInt(val, 10);
+        // Detect if milliseconds (13 digits) or seconds (10 digits)
+        date = val.length >= 13 ? new Date(num) : new Date(num * 1000);
+      } else {
+        // Try parsing as date string
+        date = new Date(val);
+      }
+
+      if (isNaN(date.getTime())) {
+        throw new Error("Invalid format");
+      }
+
+      const unix = Math.floor(date.getTime() / 1000);
+      setTimeData({
+        unix,
+        utc: date.toUTCString(),
+        local: date.toLocaleString(),
+        iso: date.toISOString(),
+        relative: getRelativeTime(unix)
+      });
+    } catch (err) {
+      setError("Please enter a valid Unix timestamp or Date string");
+      setTimeData(null);
+    }
   }, []);
 
-  const getRelativeTime = (date: Date): string => {
-    const now = new Date();
-    const diffInSeconds = Math.floor((date.getTime() - now.getTime()) / 1000);
-    const absDiff = Math.abs(diffInSeconds);
+  useEffect(() => {
+    convertValue(inputValue);
+  }, [inputValue, convertValue]);
 
-    if (absDiff < 60) return diffInSeconds >= 0 ? 'in a few seconds' : 'just now';
-    
-    const minutes = Math.floor(absDiff / 60);
-    if (minutes < 60) return diffInSeconds >= 0 ? `in ${minutes}m` : `${minutes}m ago`;
-    
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return diffInSeconds >= 0 ? `in ${hours}h` : `${hours}h ago`;
-    
-    const days = Math.floor(hours / 24);
-    return diffInSeconds >= 0 ? `in ${days}d` : `${days}d ago`;
-  };
-
-  const convertTimestamp = (ts: string): ConversionResult => {
-    try {
-      const numericTs = parseInt(ts);
-      if (isNaN(numericTs)) throw new Error('Invalid');
-      
-      const date = new Date(isMilliseconds ? numericTs : numericTs * 1000);
-      if (isNaN(date.getTime())) throw new Error('Invalid Date');
-
-      return {
-        gmt: date.toUTCString(),
-        local: date.toLocaleString(),
-        relative: getRelativeTime(date)
-      };
-    } catch {
-      return { gmt: 'Invalid Date', local: 'Invalid Date', relative: '-' };
-    }
-  };
-
-  const handleCopy = (text: string, id: string) => {
+  const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
-    setCopyFeedback(id);
-    setTimeout(() => setCopyFeedback(null), 2000);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const results = convertTimestamp(timestamp);
-
-  const setToNow = () => {
-    const now = Date.now();
-    setTimestamp(isMilliseconds ? now.toString() : Math.floor(now / 1000).toString());
-  };
-
-  const handleDateToTimestamp = (val: string) => {
-    setDateInput(val);
-    const date = new Date(val);
-    if (!isNaN(date.getTime())) {
-      const newTs = isMilliseconds ? date.getTime() : Math.floor(date.getTime() / 1000);
-      setTimestamp(newTs.toString());
-    }
+  const setNow = () => {
+    const now = Math.floor(Date.now() / 1000).toString();
+    setInputValue(now);
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-slate-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-[#0a0a0c] text-slate-200 p-6 flex items-center justify-center font-sans">
+      <div className="w-full max-w-2xl bg-[#121214] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="p-8 border-b border-white/5 bg-gradient-to-br from-indigo-500/5 to-transparent">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-indigo-500/10 rounded-lg">
+              <Clock className="w-6 h-6 text-indigo-400" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">
               Unix Timestamp Converter
             </h1>
-            <p className="text-slate-500 font-medium">Professional grade epoch conversion utility</p>
           </div>
-          
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex items-center gap-4 backdrop-blur-sm">
-            <div className="bg-indigo-500/10 p-2 rounded-lg">
-              <Clock className="w-5 h-5 text-indigo-400 animate-pulse" />
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Current Unix Epoch</div>
-              <div className="text-xl font-mono font-semibold text-slate-200">
-                {Math.floor(currentTime.getTime() / 1000)}
-              </div>
-            </div>
-          </div>
+          <p className="text-slate-400 text-sm">
+            Convert epochs to human-readable dates or vice versa instantly.
+          </p>
         </div>
 
-        {/* Main Interface Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* Controls Panel */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center gap-2 mb-6 text-slate-400">
-                <ArrowRightLeft size={18} className="text-indigo-400" />
-                <span className="text-sm font-semibold uppercase tracking-wider">Input Parameters</span>
-              </div>
-
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Timestamp</label>
-                  <div className="relative group">
-                    <input
-                      type="text"
-                      value={timestamp}
-                      onChange={(e) => setTimestamp(e.target.value.replace(/[^0-9]/g, ''))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 font-mono text-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all hover:border-slate-700"
-                    />
-                    <button 
-                      onClick={() => handleCopy(timestamp, 'ts')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-indigo-400 transition-colors"
-                    >
-                      {copyFeedback === 'ts' ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Copy size={18} />}
-                    </button>
-                  </div>
+        {/* Input Section */}
+        <div className="p-8 space-y-6">
+          <div className="relative">
+            <label className="block text-xs font-medium uppercase tracking-widest text-slate-500 mb-2">
+              Input (Timestamp or Date String)
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder="Enter timestamp (e.g. 1715424000) or date..."
+                  className="w-full bg-[#1a1a1e] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-all"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <ArrowRightLeft className="w-4 h-4 text-slate-600" />
                 </div>
-
-                <div className="flex items-center justify-between p-1 bg-slate-950 rounded-xl border border-slate-800">
-                  <button
-                    onClick={() => { setIsMilliseconds(false); setTimestamp(prev => isMilliseconds ? Math.floor(parseInt(prev)/1000).toString() : prev); }}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!isMilliseconds ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                  >
-                    SECONDS
-                  </button>
-                  <button
-                    onClick={() => { setIsMilliseconds(true); setTimestamp(prev => !isMilliseconds ? (parseInt(prev)*1000).toString() : prev); }}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${isMilliseconds ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                  >
-                    MILLISECONDS
-                  </button>
-                </div>
-
-                <button 
-                  onClick={setToNow}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98]"
-                >
-                  <RefreshCw size={18} />
-                  Reset to Current
-                </button>
               </div>
+              <button
+                onClick={setNow}
+                className="px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors flex items-center gap-2 text-sm font-medium"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Now
+              </button>
             </div>
-
-            <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center gap-2 mb-6 text-slate-400">
-                <Calendar size={18} className="text-indigo-400" />
-                <span className="text-sm font-semibold uppercase tracking-wider">Date Selector</span>
+            {error && (
+              <div className="mt-2 flex items-center gap-2 text-red-400 text-xs italic">
+                <AlertCircle className="w-3 h-3" />
+                {error}
               </div>
-              <input
-                type="datetime-local"
-                value={dateInput}
-                onChange={(e) => handleDateToTimestamp(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all color-scheme-dark"
+            )}
+          </div>
+
+          {/* Results Grid */}
+          {timeData && (
+            <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <ResultCard
+                label="Unix Timestamp"
+                value={timeData.unix.toString()}
+                icon={<Clock className="w-4 h-4" />}
+                onCopy={() => handleCopy(timeData.unix.toString(), 'unix')}
+                isCopied={copiedField === 'unix'}
               />
-            </div>
-          </div>
-
-          {/* Results Panel */}
-          <div className="lg:col-span-7">
-            <div className="bg-slate-900/40 border border-slate-800 rounded-3xl h-full shadow-2xl backdrop-blur-xl overflow-hidden">
-              <div className="p-6 border-b border-slate-800/50 bg-slate-800/20">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">Conversion Results</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ResultCard
+                  label="Local Time"
+                  value={timeData.local}
+                  icon={<Calendar className="w-4 h-4" />}
+                  onCopy={() => handleCopy(timeData.local, 'local')}
+                  isCopied={copiedField === 'local'}
+                />
+                <ResultCard
+                  label="UTC Time"
+                  value={timeData.utc}
+                  icon={<Calendar className="w-4 h-4" />}
+                  onCopy={() => handleCopy(timeData.utc, 'utc')}
+                  isCopied={copiedField === 'utc'}
+                />
               </div>
-              
-              <div className="divide-y divide-slate-800/50">
-                {/* Result Item 1 */}
-                <div className="p-6 hover:bg-slate-800/20 transition-colors group">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-tighter">GMT / UTC Time</span>
-                    <button 
-                      onClick={() => handleCopy(results.gmt, 'gmt')}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-slate-800 rounded-lg text-slate-400"
-                    >
-                      {copyFeedback === 'gmt' ? <CheckCircle2 size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                    </button>
-                  </div>
-                  <div className="text-2xl font-mono text-slate-100 break-words">{results.gmt}</div>
-                </div>
-
-                {/* Result Item 2 */}
-                <div className="p-6 hover:bg-slate-800/20 transition-colors group">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-tighter">Your Local Time</span>
-                    <button 
-                      onClick={() => handleCopy(results.local, 'local')}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-slate-800 rounded-lg text-slate-400"
-                    >
-                      {copyFeedback === 'local' ? <CheckCircle2 size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                    </button>
-                  </div>
-                  <div className="text-2xl font-mono text-slate-100 break-words">{results.local}</div>
-                </div>
-
-                {/* Result Item 3 */}
-                <div className="p-6 hover:bg-slate-800/20 transition-colors group">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-tighter">Relative</span>
-                  </div>
-                  <div className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
-                    <span className="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                    {results.relative}
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Badge */}
-              <div className="p-6 mt-auto">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase rounded-full border border-emerald-500/20">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Live Sync Active
-                </div>
+              <ResultCard
+                label="ISO 8601"
+                value={timeData.iso}
+                icon={<Clock className="w-4 h-4" />}
+                onCopy={() => handleCopy(timeData.iso, 'iso')}
+                isCopied={copiedField === 'iso'}
+              />
+              <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
+                <span className="text-xs font-medium uppercase tracking-widest text-indigo-400/70">Relative Time</span>
+                <p className="text-lg font-medium text-indigo-200 mt-1">{timeData.relative}</p>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Info Footer */}
-        <footer className="pt-8 border-t border-slate-800/50 flex flex-col md:flex-row gap-6 text-slate-500 text-sm">
-          <div className="flex-1">
-            <h4 className="text-slate-300 font-bold mb-2">What is Unix Time?</h4>
-            <p className="leading-relaxed">
-              Unix time (also known as Epoch time) is a system for describing a point in time. It is the number of seconds that have elapsed since the Unix epoch, minus leap seconds; the Unix epoch is 00:00:00 UTC on 1 January 1970.
-            </p>
-          </div>
-          <div className="flex-1">
-            <h4 className="text-slate-300 font-bold mb-2">Technical Note</h4>
-            <p className="leading-relaxed">
-              JavaScript handles time in milliseconds. If your timestamp is 13 digits, it is likely in milliseconds. If it is 10 digits, it is in seconds. This tool supports both formats.
-            </p>
-          </div>
-        </footer>
+        {/* Footer */}
+        <div className="px-8 py-4 bg-black/20 border-t border-white/5 text-center">
+          <p className="text-[10px] text-slate-600 uppercase tracking-[0.2em]">
+            Precision Temporal Conversion Engine
+          </p>
+        </div>
       </div>
-
-      <style jsx global>{`
-        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-          filter: invert(1);
-          cursor: pointer;
-        }
-      `}</style>
     </div>
   );
 };
+
+interface ResultCardProps {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  onCopy: () => void;
+  isCopied: boolean;
+}
+
+const ResultCard: React.FC<ResultCardProps> = ({ label, value, icon, onCopy, isCopied }) => (
+  <div className="group relative p-4 bg-[#1a1a1e] border border-white/5 rounded-xl hover:border-indigo-500/30 transition-all">
+    <div className="flex justify-between items-start mb-1">
+      <div className="flex items-center gap-2 text-slate-500">
+        {icon}
+        <span className="text-xs font-medium uppercase tracking-widest">{label}</span>
+      </div>
+      <button
+        onClick={onCopy}
+        className={`p-1.5 rounded-md transition-all ${
+          isCopied ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-white/5 text-slate-500 hover:text-white'
+        }`}
+      >
+        {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+      </button>
+    </div>
+    <div className="text-white font-mono text-sm break-all leading-relaxed">
+      {value}
+    </div>
+  </div>
+);
 
 export default UnixTimestampConverter;
