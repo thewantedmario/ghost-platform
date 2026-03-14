@@ -1,0 +1,18 @@
+name: Ghost Marketing - Twice Daily
+
+on:
+  schedule:
+    - cron: '0 9,21 * * *' # Runs at 9 AM and 9 PM daily
+  workflow_dispatch:
+
+jobs:
+  find-leads:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Traffic Finder
+        run: |
+          python scripts/traffic_finder.py
+          python scripts/update_homepage.py # Keeps homepage metadata fresh

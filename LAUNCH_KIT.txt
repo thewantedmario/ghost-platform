@@ -1,0 +1,7 @@
+
+    🚀 PRODUCT HUNT LAUNCH KIT
+    Title: Ghost Platform - 10+ AI-Powered Dev Utilities
+    Tagline: The fastest, zero-tracking utility hub for modern developers.
+    Description: We automated a factory that builds tools based on Google trends. 
+    Currently featuring: Base64 Image Decoder, Character Count Tool, Crontab Generator, Json To Yaml Converter, Jwt Debugger.
+    

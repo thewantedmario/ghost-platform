@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Script from 'next/script';
 import AdUnit from '@/components/AdUnit';
+import GhostAnalytics from '@/components/Analytics';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-black text-white antialiased">
+        <GhostAnalytics />
         <header className="border-b border-zinc-800 p-4 flex justify-between items-center bg-zinc-900/50 backdrop-blur-md sticky top-0 z-50">
           <a href="/" className="font-bold text-xl tracking-tighter">GHOST<span className="text-blue-500">PLATFORM</span></a>
           <div className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20 uppercase font-mono">
