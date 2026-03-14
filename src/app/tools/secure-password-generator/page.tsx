@@ -1,211 +1,216 @@
 'use client';
 
-"use client";
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, RefreshCw, Check, ShieldCheck, ShieldAlert, Shield } from 'lucide-react';
+import { Copy, RefreshCw, ShieldCheck, ShieldAlert, Shield, Lock, Check } from 'lucide-react';
 
-const SecurePasswordGenerator = () => {
-  const [password, setPassword] = useState('');
-  const [length, setLength] = useState(16);
-  const [options, setOptions] = useState({
+interface PasswordSettings {
+  length: number;
+  uppercase: boolean;
+  lowercase: boolean;
+  numbers: boolean;
+  symbols: boolean;
+}
+
+const SecurePasswordGenerator: React.FC = () => {
+  const [password, setPassword] = useState<string>('');
+  const [copied, setCopied] = useState<boolean>(false);
+  const [strength, setStrength] = useState<{ label: string; color: string; percent: number }>({
+    label: 'Weak',
+    color: 'bg-red-500',
+    percent: 25,
+  });
+
+  const [settings, setSettings] = useState<PasswordSettings>({
+    length: 16,
     uppercase: true,
     lowercase: true,
     numbers: true,
     symbols: true,
   });
-  const [copied, setCopied] = useState(false);
-  const [strength, setStrength] = useState<{ score: number; label: string; color: string; icon?: React.ReactNode }>({ score: 0, label: '', color: '', icon: undefined });
 
   const generatePassword = useCallback(() => {
-    const charset = {
+    const charset: Record<string, string> = {
       uppercase: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
       lowercase: 'abcdefghijklmnopqrstuvwxyz',
       numbers: '0123456789',
-      symbols: '!@#$%^&*()_+~`|}{[]:;?><,./-=',
+      symbols: '!@#$%^&*()_+-=[]{}|;:,.<>?',
     };
 
-    let characters = '';
-    if (options.uppercase) characters += charset.uppercase;
-    if (options.lowercase) characters += charset.lowercase;
-    if (options.numbers) characters += charset.numbers;
-    if (options.symbols) characters += charset.symbols;
+    let availableChars = '';
+    if (settings.uppercase) availableChars += charset.uppercase;
+    if (settings.lowercase) availableChars += charset.lowercase;
+    if (settings.numbers) availableChars += charset.numbers;
+    if (settings.symbols) availableChars += charset.symbols;
 
-    if (characters === '') {
+    if (availableChars === '') {
       setPassword('');
       return;
     }
 
     let generatedPassword = '';
-    const array = new Uint32Array(length);
+    const array = new Uint32Array(settings.length);
     window.crypto.getRandomValues(array);
 
-    for (let i = 0; i < length; i++) {
-      generatedPassword += characters.charAt(array[i] % characters.length);
+    for (let i = 0; i < settings.length; i++) {
+      generatedPassword += availableChars.charAt(array[i] % availableChars.length);
     }
 
     setPassword(generatedPassword);
-  }, [length, options]);
+  }, [settings]);
 
   const calculateStrength = useCallback(() => {
     let score = 0;
-    if (length > 12) score += 1;
-    if (length > 18) score += 1;
-    if (options.uppercase && options.lowercase) score += 1;
-    if (options.numbers) score += 1;
-    if (options.symbols) score += 1;
+    if (settings.length > 12) score += 1;
+    if (settings.length > 18) score += 1;
+    if (settings.uppercase) score += 1;
+    if (settings.lowercase) score += 1;
+    if (settings.numbers) score += 1;
+    if (settings.symbols) score += 1;
 
-    if (score <= 2) return { score, label: 'Weak', color: 'bg-red-500', icon: <ShieldAlert className="w-4 h-4" /> };
-    if (score <= 3) return { score, label: 'Fair', color: 'bg-yellow-500', icon: <Shield className="w-4 h-4" /> };
-    if (score <= 4) return { score, label: 'Strong', color: 'bg-emerald-500', icon: <ShieldCheck className="w-4 h-4" /> };
-    return { score, label: 'Very Strong', color: 'bg-indigo-500', icon: <ShieldCheck className="w-4 h-4" /> };
-  }, [length, options]);
+    if (score <= 2) {
+      setStrength({ label: 'Weak', color: 'bg-rose-500', percent: 25 });
+    } else if (score <= 4) {
+      setStrength({ label: 'Moderate', color: 'bg-amber-500', percent: 50 });
+    } else if (score <= 5) {
+      setStrength({ label: 'Strong', color: 'bg-emerald-500', percent: 75 });
+    } else {
+      setStrength({ label: 'Unbreakable', color: 'bg-indigo-500', percent: 100 });
+    }
+  }, [settings]);
 
   useEffect(() => {
     generatePassword();
   }, [generatePassword]);
 
   useEffect(() => {
-    setStrength(calculateStrength());
-  }, [password, calculateStrength]);
+    calculateStrength();
+  }, [calculateStrength]);
 
   const copyToClipboard = async () => {
     if (!password) return;
-    await navigator.clipboard.writeText(password);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy!', err);
+    }
   };
 
-  const toggleOption = (key: keyof typeof options) => {
-    setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggleSetting = (key: keyof Omit<PasswordSettings, 'length'>) => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 font-sans antialiased text-slate-200">
-      <div className="w-full max-w-lg">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-b from-white to-slate-400 bg-clip-text text-transparent mb-2">
-            Secure Gen
-          </h1>
-          <p className="text-slate-500 text-sm font-medium tracking-wide uppercase">Enterprise Grade Encryption Tools</p>
+      <div className="w-full max-w-md bg-slate-900/50 border border-slate-800 backdrop-blur-xl rounded-3xl p-8 shadow-2xl">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-3 bg-indigo-500/10 rounded-2xl">
+            <Lock className="w-6 h-6 text-indigo-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-white">ShieldGen</h1>
+            <p className="text-xs text-slate-500 font-medium uppercase tracking-widest">Enterprise Security</p>
+          </div>
         </div>
 
-        {/* Main Card */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-transparent pointer-events-none" />
-          
-          {/* Display Section */}
-          <div className="relative mb-8">
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 flex items-center justify-between group-hover:border-slate-700 transition-colors">
-              <span className="text-xl md:text-2xl font-mono truncate mr-4 text-indigo-100 tracking-wider">
-                {password || 'Select options...'}
+        <div className="relative group mb-8">
+          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
+          <div className="relative bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between overflow-hidden">
+            <div className="text-xl font-mono truncate mr-4 text-indigo-100 tracking-wider">
+              {password || 'Select options...'}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={generatePassword}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                title="Regenerate"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+              <button
+                onClick={copyToClipboard}
+                className={`p-2 rounded-lg transition-all duration-300 ${
+                  copied ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+                title="Copy to clipboard"
+              >
+                {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <div className="flex justify-between mb-4 items-end">
+              <span className="text-sm font-semibold text-slate-400">Password Length</span>
+              <span className="text-2xl font-bold text-indigo-400">{settings.length}</span>
+            </div>
+            <input
+              type="range"
+              min="8"
+              max="50"
+              value={settings.length}
+              onChange={(e) => setSettings({ ...settings, length: parseInt(e.target.value) })}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { key: 'uppercase', label: 'Uppercase', icon: 'ABC' },
+              { key: 'lowercase', label: 'Lowercase', icon: 'abc' },
+              { key: 'numbers', label: 'Numbers', icon: '123' },
+              { key: 'symbols', label: 'Symbols', icon: '#@&' },
+            ].map((option) => (
+              <button
+                key={option.key}
+                onClick={() => toggleSetting(option.key as keyof Omit<PasswordSettings, 'length'>)}
+                className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 ${
+                  settings[option.key as keyof PasswordSettings]
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-100'
+                    : 'bg-slate-900/50 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span className="text-xs font-bold uppercase tracking-wider">{option.label}</span>
+                <span className="text-[10px] font-mono opacity-60">{option.icon}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                {strength.percent <= 25 ? (
+                  <ShieldAlert className="w-4 h-4 text-rose-500" />
+                ) : strength.percent >= 75 ? (
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                ) : (
+                  <Shield className="w-4 h-4 text-amber-500" />
+                )}
+                <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Security Strength</span>
+              </div>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${strength.color} bg-opacity-10 text-opacity-100 ${strength.color.replace('bg-', 'text-')}`}>
+                {strength.label}
               </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={generatePassword}
-                  className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all active:scale-95"
-                  title="Regenerate"
-                >
-                  <RefreshCw size={20} />
-                </button>
-                <button
-                  onClick={copyToClipboard}
-                  className={`p-2.5 rounded-xl transition-all active:scale-95 flex items-center gap-2 ${
-                    copied 
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                    : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-500/20'
-                  }`}
-                >
-                  {copied ? <Check size={20} /> : <Copy size={20} />}
-                </button>
-              </div>
             </div>
-
-            {/* Strength Indicator */}
-            <div className="mt-4 flex items-center gap-4 px-1">
-              <div className="flex-1 h-1.5 flex gap-1.5">
-                {[1, 2, 3, 4, 5].map((step) => (
-                  <div
-                    key={step}
-                    className={`h-full flex-1 rounded-full transition-all duration-500 ${
-                      step <= strength.score ? strength.color : 'bg-slate-800'
-                    }`}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider min-w-[100px] justify-end">
-                {strength.icon && <span style={{ color: strength.color.replace('bg-', 'text-') }}>{strength.icon}</span>}
-                <span className="text-slate-400">{strength.label}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Controls Section */}
-          <div className="space-y-8">
-            {/* Length Slider */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-end">
-                <label className="text-sm font-semibold text-slate-400 uppercase tracking-widest">Password Length</label>
-                <span className="text-3xl font-mono font-bold text-indigo-400">{length}</span>
-              </div>
-              <input
-                type="range"
-                min="8"
-                max="50"
-                value={length}
-                onChange={(e) => setLength(parseInt(e.target.value))}
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400 transition-all"
-              />
-            </div>
-
-            {/* Checkboxes */}
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(options).map(([key, value]) => (
-                <button
-                  key={key}
-                  onClick={() => toggleOption(key as keyof typeof options)}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 ${
-                    value 
-                    ? 'bg-indigo-500/5 border-indigo-500/40 text-indigo-100' 
-                    : 'bg-slate-900/30 border-slate-800 text-slate-500 hover:border-slate-700'
-                  }`}
-                >
-                  <span className="text-sm font-medium capitalize">{key}</span>
-                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
-                    value ? 'bg-indigo-500 border-indigo-500' : 'bg-transparent border-slate-700'
-                  }`}>
-                    {value && <Check size={14} className="text-white stroke-[3px]" />}
-                  </div>
-                </button>
-              ))}
+            <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-500 ease-out ${strength.color}`}
+                style={{ width: `${strength.percent}%` }}
+              ></div>
             </div>
           </div>
         </div>
 
-        {/* Footer Info */}
-        <p className="mt-8 text-center text-slate-600 text-xs">
-          Securely generated in-browser using Cryptographically Strong Pseudo-Random Number Generator (CSPRNG).
-        </p>
+        <div className="mt-8 text-center">
+          <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
+            Cryptographically secure generation using Web Crypto API.<br />
+            No data ever leaves your browser.
+          </p>
+        </div>
       </div>
-
-      <style jsx global>{`
-        input[type='range']::-webkit-slider-thumb {
-          appearance: none;
-          width: 24px;
-          height: 24px;
-          background: #6366f1;
-          border: 4px solid #1e293b;
-          border-radius: 50%;
-          cursor: pointer;
-          box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-          transition: all 0.2s ease;
-        }
-        input[type='range']::-webkit-slider-thumb:hover {
-          transform: scale(1.1);
-          background: #818cf8;
-        }
-      `}</style>
     </div>
   );
 };

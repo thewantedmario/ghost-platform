@@ -46,7 +46,8 @@ tools = [
     "Secure Password Generator",
     "JSON to YAML Converter",
     "Character Count Tool",
-    "Unix Timestamp Converter"
+    "Unix Timestamp Converter",
+    "Unit Converter"
 ]
 
 if __name__ == "__main__":

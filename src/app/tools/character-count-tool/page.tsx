@@ -1,27 +1,62 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Copy, Trash2, Clock, AlignLeft, Hash, FileText, Layers, CheckCircle } from 'lucide-react';
+import { 
+  Copy, 
+  Trash2, 
+  Type, 
+  FileText, 
+  Clock, 
+  Hash, 
+  AlignLeft, 
+  CheckCircle2,
+  BarChart3
+} from 'lucide-react';
 
-const CharacterCounter = () => {
-  const [text, setText] = useState('');
-  const [copied, setCopied] = useState(false);
+interface StatsCardProps {
+  label: string;
+  value: number | string;
+  icon: React.ReactNode;
+}
+
+const StatsCard: React.FC<StatsCardProps> = ({ label, value, icon }) => (
+  <div className="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl backdrop-blur-sm transition-all hover:border-indigo-500/50 hover:bg-slate-900/80 group">
+    <div className="flex items-center justify-between mb-2">
+      <span className="text-slate-400 text-sm font-medium">{label}</span>
+      <div className="text-indigo-400 group-hover:scale-110 transition-transform">
+        {icon}
+      </div>
+    </div>
+    <div className="text-3xl font-bold text-white tracking-tight">{value}</div>
+  </div>
+);
+
+const CharacterCountTool: React.FC = () => {
+  const [text, setText] = useState<string>('');
+  const [copied, setCopied] = useState<boolean>(false);
 
   const stats = useMemo(() => {
     const trimmedText = text.trim();
+    const words = trimmedText ? trimmedText.split(/\s+/).length : 0;
+    const chars = text.length;
+    const charsNoSpaces = text.replace(/\s/g, '').length;
+    const sentences = text.split(/[.!?]+/).filter(Boolean).length;
+    const paragraphs = text.split(/\n+/).filter(Boolean).length;
+    const readingTime = Math.ceil(words / 200);
+
     return {
-      characters: text.length,
-      charactersNoSpaces: text.replace(/\s/g, '').length,
-      words: trimmedText ? trimmedText.split(/\s+/).length : 0,
-      sentences: trimmedText ? trimmedText.split(/[.!?]+/).filter(Boolean).length : 0,
-      paragraphs: trimmedText ? text.split(/\n\s*\n/).filter(Boolean).length : 0,
-      readingTime: Math.ceil((trimmedText ? trimmedText.split(/\s+/).length : 0) / 200),
+      words,
+      chars,
+      charsNoSpaces,
+      sentences,
+      paragraphs,
+      readingTime
     };
   }, [text]);
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [text]);
@@ -31,154 +66,125 @@ const CharacterCounter = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6 md:p-12 font-sans">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <header className="mb-12 space-y-2">
-          <div className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium tracking-wider uppercase mb-4">
-            Professional Tools
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-6 md:p-12 font-sans selection:bg-indigo-500/30">
+      <div className="max-w-6xl mx-auto space-y-12">
+        {/* Header Section */}
+        <header className="space-y-4 text-center">
+          <div className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-widest mb-2">
+            Professional Editor Tools
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-500">
-            Character Count Tool
+          <h1 className="text-5xl md:text-6xl font-extrabold text-white tracking-tighter">
+            Character <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Counter</span>
           </h1>
-          <p className="text-neutral-400 text-lg max-w-2xl">
-            Analyze your content with precision. Get instant metrics on characters, words, and readability for your professional copy.
+          <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+            Analyze your content with precision. Get instant metrics on characters, words, and readability with our high-performance text processor.
           </p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Main Input Area */}
-          <div className="lg:col-span-8 space-y-6">
+        {/* Main Interface */}
+        <main className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Input Area */}
+          <div className="lg:col-span-8 space-y-4">
             <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
-              <div className="relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+              <div className="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+                  <span className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                    <AlignLeft size={16} className="text-indigo-400" /> Editor
+                  </span>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={handleClear}
+                      className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                      title="Clear text"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <button 
+                      onClick={handleCopy}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-indigo-500/20 active:scale-95 disabled:opacity-50"
+                      disabled={!text}
+                    >
+                      {copied ? <CheckCircle2 size={18} /> : <Copy size={18} />}
+                      {copied ? 'Copied!' : 'Copy Text'}
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Paste your content here or start typing..."
-                  className="w-full h-96 bg-neutral-900 border border-neutral-800 rounded-2xl p-6 text-neutral-200 placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all resize-none text-lg leading-relaxed shadow-2xl"
+                  className="w-full h-[450px] bg-transparent p-8 text-lg text-slate-200 placeholder-slate-600 focus:outline-none resize-none leading-relaxed"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Panel */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl shadow-xl">
+              <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+                <BarChart3 size={20} className="text-indigo-400" /> Real-time Analytics
+              </h3>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <StatsCard 
+                  label="Characters" 
+                  value={stats.chars.toLocaleString()} 
+                  icon={<Type size={20} />} 
+                />
+                <StatsCard 
+                  label="Words" 
+                  value={stats.words.toLocaleString()} 
+                  icon={<FileText size={20} />} 
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800">
+                    <div className="text-slate-500 text-xs mb-1 uppercase font-bold tracking-wider">Sentences</div>
+                    <div className="text-xl font-bold text-white">{stats.sentences}</div>
+                  </div>
+                  <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-800">
+                    <div className="text-slate-500 text-xs mb-1 uppercase font-bold tracking-wider">Paragraphs</div>
+                    <div className="text-xl font-bold text-white">{stats.paragraphs}</div>
+                  </div>
+                </div>
                 
-                <div className="absolute bottom-4 right-4 flex items-center space-x-2">
-                  <button
-                    onClick={handleClear}
-                    className="p-3 bg-neutral-800 hover:bg-red-500/10 text-neutral-400 hover:text-red-400 rounded-xl transition-all duration-200 border border-neutral-700 hover:border-red-500/30"
-                    title="Clear Text"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                  <button
-                    onClick={handleCopy}
-                    className={`flex items-center space-x-2 px-5 py-3 rounded-xl transition-all duration-200 font-medium ${
-                      copied 
-                        ? 'bg-green-500/10 text-green-400 border border-green-500/30' 
-                        : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                    }`}
-                  >
-                    {copied ? (
-                      <>
-                        <CheckCircle size={20} />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={20} />
-                        <span>Copy Text</span>
-                      </>
-                    )}
-                  </button>
+                <div className="mt-4 pt-6 border-t border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400 flex items-center gap-2">
+                      <Hash size={14} /> Excl. Spaces
+                    </span>
+                    <span className="text-indigo-300 font-mono">{stats.charsNoSpaces}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400 flex items-center gap-2">
+                      <Clock size={14} /> Reading Time
+                    </span>
+                    <span className="text-cyan-300 font-mono">~{stats.readingTime} min</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Visual Progress Bar (Optional context like character limit) */}
-            <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex flex-col flex-1">
-                <div className="flex justify-between mb-2 px-1">
-                  <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Storage Usage (Simulated)</span>
-                  <span className="text-xs text-neutral-400">{((stats.characters / 10000) * 100).toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-neutral-800 rounded-full h-1.5">
-                  <div 
-                    className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min((stats.characters / 10000) * 100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
+            {/* Premium Tip/Status */}
+            <div className="bg-gradient-to-br from-indigo-600/20 to-cyan-600/20 border border-indigo-500/20 rounded-2xl p-5">
+              <p className="text-indigo-200 text-sm leading-relaxed">
+                <span className="font-bold text-white block mb-1">Editor Pro Tip:</span>
+                For SEO optimization, keep your meta descriptions between 150-160 characters and titles under 60.
+              </p>
             </div>
           </div>
+        </main>
 
-          {/* Stats Sidebar */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
-              <StatCard 
-                icon={<Hash className="text-indigo-400" size={20} />} 
-                label="Characters" 
-                value={stats.characters} 
-                subValue={`${stats.charactersNoSpaces} (no spaces)`}
-              />
-              <StatCard 
-                icon={<AlignLeft className="text-blue-400" size={20} />} 
-                label="Words" 
-                value={stats.words} 
-              />
-              <StatCard 
-                icon={<FileText className="text-purple-400" size={20} />} 
-                label="Sentences" 
-                value={stats.sentences} 
-              />
-              <StatCard 
-                icon={<Layers className="text-emerald-400" size={20} />} 
-                label="Paragraphs" 
-                value={stats.paragraphs} 
-              />
-              <StatCard 
-                icon={<Clock className="text-amber-400" size={20} />} 
-                label="Reading Time" 
-                value={`${stats.readingTime} min`} 
-                subValue="Avg. 200 wpm"
-              />
-            </div>
-
-            <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white overflow-hidden relative group">
-              <div className="relative z-10">
-                <h3 className="text-lg font-bold mb-1">Upgrade to Pro</h3>
-                <p className="text-indigo-100 text-sm mb-4">Get SEO keyword density analysis and readability scoring.</p>
-                <button className="w-full py-2.5 bg-white text-indigo-600 rounded-lg font-semibold text-sm hover:bg-neutral-100 transition-colors">
-                  Learn More
-                </button>
-              </div>
-              <div className="absolute -right-4 -bottom-4 opacity-20 transform group-hover:scale-110 transition-transform duration-700">
-                <FileText size={120} />
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Footer info */}
+        <footer className="pt-8 border-t border-slate-900 text-center">
+          <p className="text-slate-500 text-sm">
+            Developed with Next.js and Tailwind CSS • Secure, Browser-based processing.
+          </p>
+        </footer>
       </div>
     </div>
   );
 };
 
-interface StatCardProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  subValue?: string; // The '?' makes it optional
-}
-
-const StatCard = ({ icon, label, value, subValue }: StatCardProps) => (
-  <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-2xl hover:border-neutral-700 transition-all duration-300 group">
-    <div className="flex items-center justify-between mb-3">
-      <div className="p-2 bg-neutral-800 rounded-lg group-hover:scale-110 transition-transform duration-300">
-        {icon}
-      </div>
-      <span className="text-neutral-500 text-xs font-bold uppercase tracking-widest">{label}</span>
-    </div>
-    <div className="flex flex-col">
-      <span className="text-2xl font-bold text-neutral-100 tracking-tight">{value}</span>
-      {subValue && <span className="text-xs text-neutral-500 mt-1">{subValue}</span>}
-    </div>
-  </div>
-);
-
-export default CharacterCounter;
+export default CharacterCountTool;
