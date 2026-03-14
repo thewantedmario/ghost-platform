@@ -44,11 +44,32 @@ export default function RootLayout({
         </header>
 
         {/* TOP AD - Replace with your actual Zone ID */}
+        <Script
+          id="native-banner-top"
+          src="https://consumptionbackwardsentiments.com/b1aff45fccdd6bc09be1b32e952be658/invoke.js"
+          async
+          strategy="afterInteractive"
+        />
+        <div id="container-b1aff45fccdd6bc09be1b32e952be658"></div>
         <AdUnit zoneId="28816518" />
 
         <main>{children}</main>
 
         {/* BOTTOM AD - Replace with your actual Zone ID */}
+        <Script id="adunit-bottom-opts" strategy="afterInteractive">
+          {`atOptions = {
+            'key' : 'b28d6259d584a85eaf96ca087c785b74',
+            'format' : 'iframe',
+            'height' : 90,
+            'width' : 728,
+            'params' : {}
+          };`}
+        </Script>
+        <Script
+          id="native-banner-bottom"
+          src="https://consumptionbackwardsentiments.com/b28d6259d584a85eaf96ca087c785b74/invoke.js"
+          strategy="afterInteractive"
+        />
         <AdUnit zoneId="28816522" />
 
         <footer className="p-10 border-t border-zinc-800 text-center">
