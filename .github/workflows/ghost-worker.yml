@@ -1,14 +1,17 @@
 name: Ghost Worker - Auto Tool Generator
+name: Ghost Worker - Full Automation
 
 on:
   schedule:
-    - cron: '0 0 * * 0' # Runs every Sunday at Midnight
-  workflow_dispatch:      # Allows you to click "Run" manually
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
 
 permissions:
   contents: write         # CRITICAL: Allows the robot to save tools & homepage
   pages: write            # CRITICAL: Allows the robot to push changes to GitHub Pages
   id-token: write         # CRITICAL: Allows the robot to use the GitHub API
+  pull-requests: write
+
 
 jobs:
   build-and-deploy:
