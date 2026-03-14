@@ -3,7 +3,8 @@ export default function Home() {
     { name: "Secure Password Generator", path: "/tools/secure-password-generator", desc: "Generate unhackable passwords instantly." },
     { name: "JSON to YAML Converter", path: "/tools/json-to-yaml-converter", desc: "Convert data formats for developers." },
     { name: "Character Count Tool", path: "/tools/character-count-tool", desc: "Perfect for social media and SEO writing." },
-    { name: "Unix Timestamp Converter", path: "/tools/unix-timestamp-converter", desc: "Convert epoch time to human-readable dates." }
+    { name: "Unix Timestamp Converter", path: "/tools/unix-timestamp-converter", desc: "Convert epoch time to human-readable dates." },
+    { name: "Unit Converter", path: "/tools/unit-converter", desc: "Convert between length, weight, temperature, and more." }
   ];
 
   return (
