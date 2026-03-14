@@ -1,6 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Copy, Check, Trash2, FileJson, FileCode, AlertCircle, ArrowRightLeft } from 'lucide-react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+/**
+ * Utility for Tailwind CSS class merging
+ */
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface ConversionState {
   json: string;
@@ -10,218 +20,210 @@ interface ConversionState {
 
 const JsonToYamlConverter: React.FC = () => {
   const [state, setState] = useState<ConversionState>({
-    json: '{\n  "project": "Nexus Core",\n  "version": "1.0.0",\n  "active": true,\n  "metadata": {\n    "tags": ["typescript", "react", "premium"],\n    "author": "System-X"\n  }\n}',
+    json: '{\n  "project": "Nexus Core",\n  "version": "1.0.0",\n  "description": "Premium JSON to YAML converter",\n  "features": [\n    "Real-time conversion",\n    "Error validation",\n    "High-end UI"\n  ],\n  "settings": {\n    "theme": "dark",\n    "active": true\n  }\n}',
     yaml: '',
     error: null,
   });
 
-  const [isCopied, setIsCopied] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const jsonToYaml = (obj: any, indent: number = 0): string => {
+  /**
+   * Extremely lightweight YAML stringifier to keep the component 
+   * dependency-free while maintaining "strictly TypeScript-safe" requirements.
+   */
+  const convertToYaml = useCallback((obj: any, indent: number = 0): string => {
     const spaces = '  '.repeat(indent);
-    
     if (obj === null) return 'null';
-    if (typeof obj === 'string') return `"${obj}"`;
-    if (typeof obj !== 'object') return String(obj);
+    if (typeof obj === 'undefined') return '';
+    if (typeof obj !== 'object') {
+      if (typeof obj === 'string') return `"${obj.replace(/"/g, '\\"')}"`;
+      return String(obj);
+    }
 
     if (Array.isArray(obj)) {
       if (obj.length === 0) return '[]';
-      return obj.map(item => `\n${spaces}- ${jsonToYaml(item, indent + 1)}`).join('');
+      return obj
+        .map((item) => `\n${spaces}- ${convertToYaml(item, indent + 1).trim()}`)
+        .join('');
     }
 
-    const keys = Object.keys(obj);
-    if (keys.length === 0) return '{}';
+    const entries = Object.entries(obj);
+    if (entries.length === 0) return '{}';
 
-    return keys
-      .map(key => {
-        const value = obj[key];
-        const formattedValue = typeof value === 'object' && value !== null 
-          ? jsonToYaml(value, indent + 1)
-          : ` ${jsonToYaml(value, indent + 1)}`;
-        
-        return `\n${spaces}${key}:${formattedValue}`;
+    return entries
+      .map(([key, value]) => {
+        const formattedValue = convertToYaml(value, indent + 1);
+        const separator = typeof value === 'object' && value !== null && !Array.isArray(value) ? '' : ' ';
+        return `\n${spaces}${key}:${separator}${formattedValue.trim()}`;
       })
-      .join('')
-      .trim();
-  };
+      .join('');
+  }, []);
 
-  const convert = useCallback((input: string) => {
+  const handleConvert = useCallback((input: string) => {
     if (!input.trim()) {
-      setState(prev => ({ ...prev, yaml: '', error: null }));
+      setState((prev) => ({ ...prev, json: input, yaml: '', error: null }));
       return;
     }
 
     try {
       const parsed = JSON.parse(input);
-      const result = jsonToYaml(parsed);
-      setState(prev => ({ ...prev, yaml: result.trim(), error: null }));
-    } catch (e: any) {
-      setState(prev => ({ ...prev, error: e.message }));
+      const yamlResult = convertToYaml(parsed).trim();
+      setState({ json: input, yaml: yamlResult, error: null });
+    } catch (err) {
+      setState((prev) => ({ 
+        ...prev, 
+        json: input, 
+        error: err instanceof Error ? err.message : 'Invalid JSON format' 
+      }));
     }
-  }, []);
+  }, [convertToYaml]);
 
   useEffect(() => {
-    convert(state.json);
-  }, [state.json, convert]);
+    handleConvert(state.json);
+  }, []);
 
-  const handleCopy = async () => {
+  const copyToClipboard = async () => {
     if (!state.yaml) return;
-    await navigator.clipboard.writeText(state.yaml);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(state.yaml);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
   };
 
-  const handleClear = () => {
+  const clearAll = () => {
     setState({ json: '', yaml: '', error: null });
   };
 
-  const handleSample = () => {
-    const sample = {
-      service: "api-gateway",
-      replicas: 3,
-      endpoints: ["/v1/auth", "/v1/user", "/v1/data"],
-      config: {
-        timeout: 5000,
-        retries: {
-          max: 5,
-          delay: "100ms"
-        }
-      }
-    };
-    setState(prev => ({ ...prev, json: JSON.stringify(sample, null, 2) }));
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-300 p-6 md:p-12 font-sans selection:bg-indigo-500/30">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-              JSON to YAML Converter
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium tracking-wider uppercase">
+              Developer Tools
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+              JSON to <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">YAML</span>
             </h1>
-            <p className="text-slate-400 text-sm">Professional-grade data transformation tool.</p>
+            <p className="text-zinc-500 max-w-md">
+              A high-performance conversion utility designed for precision and speed.
+            </p>
           </div>
+
           <div className="flex items-center gap-3">
             <button
-              onClick={handleSample}
-              className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-700"
+              onClick={clearAll}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:border-zinc-700 transition-all duration-200 text-sm font-medium"
             >
-              Load Sample
-            </button>
-            <button
-              onClick={handleClear}
-              className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-700"
-            >
+              <Trash2 size={16} />
               Clear
             </button>
+            <button
+              onClick={copyToClipboard}
+              disabled={!!state.error || !state.yaml}
+              className={cn(
+                "flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-sm transition-all duration-300",
+                copied 
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                  : "bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              )}
+            >
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              {copied ? 'Copied' : 'Copy YAML'}
+            </button>
           </div>
-        </header>
+        </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-250px)] min-h-[500px]">
+        {/* Main Interface */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
           {/* Input Panel */}
-          <div className="flex flex-col h-full bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-indigo-500/50 transition-all">
-            <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Input JSON</span>
+          <div className="relative group flex flex-col h-full bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur-sm transition-all duration-300 hover:border-zinc-700">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/80">
+              <div className="flex items-center gap-2">
+                <FileJson size={18} className="text-indigo-400" />
+                <span className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Input JSON</span>
+              </div>
               {state.error && (
-                <span className="text-xs text-rose-400 font-medium animate-pulse">Invalid JSON Format</span>
+                <div className="flex items-center gap-1.5 text-red-400 text-xs bg-red-400/10 px-2 py-1 rounded-md border border-red-400/20">
+                  <AlertCircle size={14} />
+                  Invalid JSON
+                </div>
               )}
             </div>
             <textarea
               value={state.json}
-              onChange={(e) => setState(prev => ({ ...prev, json: e.target.value }))}
-              placeholder="Paste your JSON here..."
-              className="flex-1 w-full bg-transparent p-6 text-sm font-mono text-slate-300 outline-none resize-none placeholder:text-slate-700"
+              onChange={(e) => handleConvert(e.target.value)}
+              placeholder='{"key": "value"}'
               spellCheck={false}
+              className="flex-1 w-full p-6 bg-transparent outline-none resize-none font-mono text-[13px] leading-relaxed text-zinc-300 placeholder:text-zinc-700"
             />
           </div>
 
+          {/* Transfer Icon for Desktop */}
+          <div className="hidden lg:flex absolute left-1/2 top-[55%] -translate-x-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-zinc-950 border border-zinc-800 text-zinc-500">
+            <ArrowRightLeft size={20} />
+          </div>
+
           {/* Output Panel */}
-          <div className="flex flex-col h-full bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden relative">
-            <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Output YAML</span>
-              <button
-                onClick={handleCopy}
-                disabled={!state.yaml}
-                className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  isCopied 
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' 
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed'
-                }`}
-              >
-                {isCopied ? (
-                  <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                    </svg>
-                    Copy YAML
-                  </>
-                )}
-              </button>
+          <div className="relative flex flex-col h-full bg-[#0d0d0d] border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/40">
+              <div className="flex items-center gap-2">
+                <FileCode size={18} className="text-cyan-400" />
+                <span className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Output YAML</span>
+              </div>
             </div>
-            <div className="flex-1 relative overflow-auto">
-              <pre className="p-6 text-sm font-mono text-slate-300 h-full">
-                <code>{state.yaml || (state.error ? '' : '# Waiting for valid JSON input...')}</code>
-              </pre>
-              {state.error && (
-                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-8">
-                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 max-w-md w-full">
-                    <div className="flex items-center gap-3 text-rose-400 mb-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="font-bold">Parsing Error</span>
-                    </div>
-                    <p className="text-xs font-mono text-rose-300/80 leading-relaxed break-words">
-                      {state.error}
-                    </p>
+            <div className="flex-1 p-6 font-mono text-[13px] leading-relaxed overflow-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+              {state.yaml ? (
+                <pre className="text-cyan-50/90">
+                  {state.yaml}
+                </pre>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-4">
+                  <div className="p-4 rounded-full bg-zinc-900/50 border border-zinc-800/50">
+                    <FileCode size={32} strokeWidth={1.5} />
                   </div>
+                  <p className="text-sm italic">Waiting for valid input...</p>
                 </div>
               )}
             </div>
+            {/* Background Glow Effect */}
+            <div className="absolute inset-0 pointer-events-none opacity-20 bg-gradient-to-tr from-indigo-500/5 via-transparent to-cyan-500/5" />
           </div>
         </div>
 
-        {/* Footer/Stats */}
-        <footer className="mt-6 flex flex-wrap items-center justify-between gap-4 px-2">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-              <span className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Real-time Sync</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-              <span className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">Safe Execution</span>
-            </div>
+        {/* Footer / Meta */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-zinc-900">
+          <div className="flex gap-6 text-[11px] font-medium text-zinc-600 uppercase tracking-[0.2em]">
+            <span className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Client Side Only
+            </span>
+            <span>No Data Storage</span>
+            <span>UTF-8 Supported</span>
           </div>
-          <div className="text-[10px] font-medium text-slate-600 uppercase tracking-widest">
-            v1.0.4 • Optimized for Next.js
-          </div>
-        </footer>
+          <p className="text-[11px] text-zinc-700 font-mono">
+            &copy; {new Date().getFullYear()} NEXUS CORE SYSTEMS
+          </p>
+        </div>
       </div>
 
       <style jsx global>{`
-        textarea::-webkit-scrollbar, pre::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
         }
-        textarea::-webkit-scrollbar-track, pre::-webkit-scrollbar-track {
+        .scrollbar-thin::-webkit-scrollbar-track {
           background: transparent;
         }
-        textarea::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb {
-          background: #1e293b;
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: #1f1f23;
           border-radius: 10px;
         }
-        textarea::-webkit-scrollbar-thumb:hover, pre::-webkit-scrollbar-thumb:hover {
-          background: #334155;
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background: #2d2d33;
         }
       `}</style>
     </div>
