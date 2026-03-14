@@ -25,6 +25,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <meta name="google-site-verification" content="h3aCKZviqx-Idv9CJQrru8ILdn473bGKkgbERIJSzHY" />
+      </head>
       <body className="bg-black text-white antialiased">
         <header className="border-b border-zinc-800 p-4 flex justify-between items-center bg-zinc-900/50 backdrop-blur-md sticky top-0 z-50">
           <a href="/" className="font-bold text-xl tracking-tighter">GHOST<span className="text-blue-500">PLATFORM</span></a>
