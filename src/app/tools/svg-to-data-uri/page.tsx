@@ -1,204 +1,262 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Check, FileCode, ExternalLink, Image as ImageIcon, Zap, Trash2 } from 'lucide-react';
+"use client";
 
-interface ConversionResult {
-  uri: string;
-  css: string;
+import React, { useState, useEffect, useCallback } from 'react';
+import { Copy, Trash2, Check, Code2, Eye, Zap, FileJson, ArrowRightLeft } from 'lucide-react';
+
+type EncodingType = 'base64' | 'uri';
+
+interface TooltipProps {
+  text: string;
+  children: React.ReactNode;
 }
 
-const SVGToDataURI: React.FC = () => {
-  const [input, setInput] = useState<string>('');
-  const [output, setOutput] = useState<ConversionResult>({ uri: '', css: '' });
-  const [copiedType, setCopiedType] = useState<'uri' | 'css' | null>(null);
+const Tooltip: React.FC<TooltipProps> = ({ text, children }) => (
+  <div className="group relative flex items-center">
+    {children}
+    <span className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-slate-800 text-white text-xs py-1 px-2 rounded border border-slate-700 shadow-xl">
+      {text}
+    </span>
+  </div>
+);
+
+const SAMPLE_SVG = `<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="40" stroke="url(#paint0_linear)" stroke-width="8" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="paint0_linear" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#EC4899"/>
+    </linearGradient>
+  </defs>
+</svg>`;
+
+const SvgToDataUri: React.FC = () => {
+  const [input, setInput] = useState<string>(SAMPLE_SVG);
+  const [output, setOutput] = useState<string>('');
+  const [encoding, setEncoding] = useState<EncodingType>('uri');
+  const [copied, setCopied] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const encodeSVG = useCallback((svgString: string): ConversionResult => {
+  const convertToDataUri = useCallback((svg: string, type: EncodingType) => {
     try {
-      if (!svgString.trim()) return { uri: '', css: '' };
+      if (!svg.trim()) return '';
       
-      // Clean up the SVG
-      let cleaned = svgString
-        .replace(/<style.*?<\/style>/g, '') // Remove internal styles if problematic
-        .replace(/<!--[\s\S]*?-->/g, '') // Remove comments
-        .replace(/\s+/g, ' ') // Collapse whitespace
-        .trim();
-
-      if (!cleaned.includes('xmlns')) {
-        cleaned = cleaned.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      const cleanedSvg = svg.trim().replace(/>\s+</g, '><');
+      
+      if (type === 'base64') {
+        const base64 = btoa(unescape(encodeURIComponent(cleanedSvg)));
+        return `data:image/svg+xml;base64,${base64}`;
+      } else {
+        // Optimizing for URL encoding
+        const encoded = encodeURIComponent(cleanedSvg)
+          .replace(/%20/g, ' ')
+          .replace(/%3D/g, '=')
+          .replace(/%3A/g, ':')
+          .replace(/%2F/g, '/')
+          .replace(/%22/g, "'");
+        return `data:image/svg+xml,${encoded}`;
       }
-
-      // We use URL encoding instead of Base64 as it's typically smaller for SVGs
-      // and better for CSS performance.
-      const encoded = cleaned
-        .replace(/"/g, "'")
-        .replace(/%/g, '%25')
-        .replace(/#/g, '%23')
-        .replace(/{/g, '%7B')
-        .replace(/}/g, '%7D')
-        .replace(/</g, '%3C')
-        .replace(/>/g, '%3E');
-
-      const uri = `data:image/svg+xml,${encoded}`;
-      const css = `background-image: url("${uri}");`;
-      
-      setError(null);
-      return { uri, css };
     } catch (err) {
-      setError('Invalid SVG format. Please check your syntax.');
-      return { uri: '', css: '' };
+      setError('Invalid SVG syntax or encoding error');
+      return '';
     }
   }, []);
 
   useEffect(() => {
-    const result = encodeSVG(input);
-    setOutput(result);
-  }, [input, encodeSVG]);
+    setError(null);
+    setOutput(convertToDataUri(input, encoding));
+  }, [input, encoding, convertToDataUri]);
 
-  const copyToClipboard = async (text: string, type: 'uri' | 'css') => {
-    if (!text) return;
-    await navigator.clipboard.writeText(text);
-    setCopiedType(type);
-    setTimeout(() => setCopiedType(null), 2000);
+  const handleCopy = async () => {
+    if (!output) return;
+    try {
+      await navigator.clipboard.writeText(output);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
   };
 
-  const clearInput = () => {
+  const clearAll = () => {
     setInput('');
+    setOutput('');
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-200 p-6 md:p-12 font-sans selection:bg-indigo-500/30">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <header className="mb-12 space-y-4">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-sm font-medium">
-            <Zap size={14} />
-            <span>Developer Utility</span>
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-800 pb-8">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-indigo-500/10 rounded-lg">
+                <ArrowRightLeft className="w-6 h-6 text-indigo-400" />
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-white">SVG to Data URI</h1>
+            </div>
+            <p className="text-slate-400 max-w-2xl text-sm md:text-base">
+              Convert raw SVG code into production-ready Data URIs for CSS, HTML, or JavaScript.
+              Optimized for performance and compatibility.
+            </p>
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white">
-            SVG to <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Data URI</span>
-          </h1>
-          <p className="text-slate-400 text-lg max-w-2xl">
-            Convert your vector graphics into optimized, browser-ready Data URIs and CSS snippets. Premium, fast, and secure.
-          </p>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Input Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 text-sm font-semibold text-slate-300">
-                <FileCode size={18} className="text-indigo-400" />
-                <span>Source SVG</span>
-              </label>
-              <button 
-                onClick={clearInput}
-                className="text-xs text-slate-500 hover:text-red-400 transition-colors flex items-center gap-1"
+          <div className="flex items-center gap-2">
+            <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setEncoding('uri')}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  encoding === 'uri' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                }`}
               >
-                <Trash2 size={14} /> Clear
+                URL Encoded
+              </button>
+              <button
+                onClick={() => setEncoding('base64')}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  encoding === 'base64' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Base64
               </button>
             </div>
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-xl blur opacity-20 group-focus-within:opacity-40 transition duration-500"></div>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder='<svg width="100" height="100">...</svg>'
-                className="relative w-full h-[400px] bg-slate-900 border border-slate-800 rounded-xl p-6 text-sm font-mono focus:outline-none focus:ring-0 resize-none transition-all placeholder:text-slate-700"
-              />
+          </div>
+        </header>
+
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Input Section */}
+          <div className="flex flex-col h-[500px] bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-sm group hover:border-slate-700 transition-colors">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
+              <div className="flex items-center gap-2">
+                <Code2 className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Input SVG</span>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setInput(SAMPLE_SVG)}
+                  className="p-1.5 hover:bg-slate-800 rounded-md transition-colors text-slate-400 hover:text-white"
+                  title="Load Sample"
+                >
+                  <Zap className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={clearAll}
+                  className="p-1.5 hover:bg-red-500/10 rounded-md transition-colors text-slate-400 hover:text-red-400"
+                  title="Clear"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Paste your SVG code here..."
+              className="flex-1 w-full bg-transparent p-4 text-sm font-mono focus:outline-none resize-none text-indigo-300 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+              spellCheck={false}
+            />
           </div>
 
           {/* Output Section */}
-          <div className="space-y-6">
-            {/* Preview Box */}
-            <div className="space-y-4">
-              <label className="flex items-center space-x-2 text-sm font-semibold text-slate-300">
-                <ImageIcon size={18} className="text-cyan-400" />
-                <span>Live Preview</span>
-              </label>
-              <div className="h-32 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center relative overflow-hidden bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]">
-                {output.uri ? (
-                  <img src={output.uri} alt="Preview" className="max-h-24 max-w-[80%] object-contain drop-shadow-2xl" />
-                ) : (
-                  <span className="text-slate-600 text-sm italic">Waiting for input...</span>
+          <div className="flex flex-col h-[500px] gap-6">
+            <div className="flex-1 flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-sm group hover:border-slate-700 transition-colors">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
+                <div className="flex items-center gap-2">
+                  <FileJson className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Data URI Output</span>
+                </div>
+                <button
+                  onClick={handleCopy}
+                  disabled={!output}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                    copied 
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' 
+                    : 'bg-indigo-600 text-white hover:bg-indigo-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed'
+                  }`}
+                >
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copied' : 'Copy URI'}
+                </button>
+              </div>
+              <div className="relative flex-1 group/output">
+                <textarea
+                  readOnly
+                  value={output}
+                  className="w-full h-full bg-transparent p-4 text-sm font-mono focus:outline-none resize-none text-emerald-300/90 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+                />
+                {!output && !error && (
+                  <div className="absolute inset-0 flex items-center justify-center text-slate-600 pointer-events-none italic">
+                    Waiting for input...
+                  </div>
+                )}
+                {error && (
+                  <div className="absolute inset-x-0 top-0 p-4 bg-red-500/10 text-red-400 text-xs font-medium">
+                    {error}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* URI Result */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Data URI</span>
-                <button
-                  disabled={!output.uri}
-                  onClick={() => copyToClipboard(output.uri, 'uri')}
-                  className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-white"
-                >
-                  {copiedType === 'uri' ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copiedType === 'uri' ? 'Copied!' : 'Copy URI'}</span>
-                </button>
+            {/* Preview Card */}
+            <div className="h-32 flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden backdrop-blur-sm">
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/80">
+                <Eye className="w-4 h-4 text-slate-400" />
+                <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Preview</span>
               </div>
-              <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-4 font-mono text-xs break-all max-h-24 overflow-y-auto text-slate-400 scrollbar-hide">
-                {output.uri || 'Result will appear here...'}
+              <div className="flex-1 flex items-center justify-center bg-white/5 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px]">
+                {output && !error ? (
+                  <img src={output} alt="Preview" className="max-h-20 max-w-full object-contain drop-shadow-2xl" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full border-2 border-dashed border-slate-700" />
+                )}
               </div>
             </div>
-
-            {/* CSS Result */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">CSS Usage</span>
-                <button
-                  disabled={!output.css}
-                  onClick={() => copyToClipboard(output.css, 'css')}
-                  className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-white"
-                >
-                  {copiedType === 'css' ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copiedType === 'css' ? 'Copied!' : 'Copy CSS'}</span>
-                </button>
-              </div>
-              <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-4 font-mono text-xs break-all max-h-24 overflow-y-auto text-slate-400 scrollbar-hide">
-                {output.css || 'Result will appear here...'}
-              </div>
-            </div>
-
-            {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                {error}
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Footer Info */}
-        <footer className="mt-16 pt-8 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center space-x-6 text-slate-500 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              Local Processing
+        {/* Footer/Usage Tips */}
+        <footer className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-slate-900">
+          <div className="space-y-2">
+            <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              CSS Usage
+            </h3>
+            <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-400 leading-relaxed overflow-x-auto whitespace-pre">
+              {`.icon {\n  background-image: url("${output.substring(0, 30)}...");\n}`}
             </div>
-            <span>No data ever leaves your browser.</span>
           </div>
-          <div className="flex items-center space-x-4">
-             <a href="#" className="text-slate-400 hover:text-white transition-colors">
-               <ExternalLink size={18} />
-             </a>
+          <div className="space-y-2">
+            <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              HTML Usage
+            </h3>
+            <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-400 leading-relaxed overflow-x-auto whitespace-pre">
+              {`<img src="${output.substring(0, 30)}..." />`}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+              Base64 vs URI
+            </h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              URI encoding is typically 5-10% smaller and better for simple SVGs. 
+              Base64 is safer for older browsers and complex assets with non-ASCII characters.
+            </p>
           </div>
         </footer>
       </div>
-      
+
       <style jsx global>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #334155; }
       `}</style>
     </div>
   );
 };
 
-export default SVGToDataURI;
+export default SvgToDataUri;
