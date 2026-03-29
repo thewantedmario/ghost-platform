@@ -1,300 +1,274 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+"use client";
+
+import React, { useState, useCallback, useRef } from 'react';
 import { 
-  ImageIcon, 
-  Clipboard, 
-  Download, 
+  Image as ImageIcon, 
+  Copy, 
   Trash2, 
-  AlertCircle, 
-  Maximize2, 
-  CheckCircle2,
-  FileImage,
-  Layers
+  Download, 
+  Upload, 
+  Check, 
+  AlertCircle,
+  Maximize2
 } from 'lucide-react';
 
-interface ImageMetadata {
-  width: number;
-  height: number;
-  type: string;
-  size: string;
+interface DecoderState {
+  base64String: string;
+  imageSrc: string | null;
+  error: string | null;
+  fileInfo: {
+    type: string;
+    size: string;
+    dimensions: string;
+  } | null;
 }
 
 const Base64ImageDecoder: React.FC = () => {
-  const [input, setInput] = useState<string>('');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [metadata, setMetadata] = useState<ImageMetadata | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<boolean>(false);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [state, setState] = useState<DecoderState>({
+    base64String: '',
+    imageSrc: null,
+    error: null,
+    fileInfo: null,
+  });
   
+  const [copied, setCopied] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const formatBytes = (bytes: number, decimals = 2): string => {
+  const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const processBase64 = useCallback((value: string) => {
-    setError(null);
-    if (!value.trim()) {
-      setPreviewUrl(null);
-      setMetadata(null);
+  const decodeBase64 = useCallback((input: string) => {
+    const trimmedInput = input.trim();
+    if (!trimmedInput) {
+      setState({ base64String: '', imageSrc: null, error: null, fileInfo: null });
       return;
     }
 
     try {
-      let cleanInput = value.trim();
-      
-      // Attempt to identify MIME type if missing
-      if (!cleanInput.startsWith('data:image/')) {
-        // Simple heuristic for common formats
-        if (cleanInput.startsWith('/9j/')) cleanInput = 'data:image/jpeg;base64,' + cleanInput;
-        else if (cleanInput.startsWith('iVBORw0KGgo=')) cleanInput = 'data:image/png;base64,' + cleanInput;
-        else if (cleanInput.startsWith('R0lGOD')) cleanInput = 'data:image/gif;base64,' + cleanInput;
-        else if (cleanInput.startsWith('UklGR')) cleanInput = 'data:image/webp;base64,' + cleanInput;
-        else cleanInput = 'data:image/png;base64,' + cleanInput; // Default fallback
+      // Validate if it has a prefix, if not, try to guess or just use as is
+      let finalSrc = trimmedInput;
+      if (!trimmedInput.startsWith('data:image/')) {
+        // Attempt to detect common formats if prefix is missing
+        if (trimmedInput.startsWith('/9j/')) finalSrc = `data:image/jpeg;base64,${trimmedInput}`;
+        else if (trimmedInput.startsWith('iVBORw0KGgo')) finalSrc = `data:image/png;base64,${trimmedInput}`;
+        else if (trimmedInput.startsWith('R0lGODlh')) finalSrc = `data:image/gif;base64,${trimmedInput}`;
+        else if (trimmedInput.startsWith('UklGR')) finalSrc = `data:image/webp;base64,${trimmedInput}`;
+        else finalSrc = `data:image/png;base64,${trimmedInput}`;
       }
 
       const img = new Image();
       img.onload = () => {
-        setPreviewUrl(cleanInput);
-        
         // Calculate size from base64 string
-        const base64Content = cleanInput.split(',')[1];
-        const padding = base64Content.endsWith('==') ? 2 : base64Content.endsWith('=') ? 1 : 0;
-        const sizeInBytes = (base64Content.length * (3 / 4)) - padding;
+        const stringLength = trimmedInput.length - (trimmedInput.indexOf(',') + 1);
+        const sizeInBytes = Math.ceil((stringLength * 3) / 4);
 
-        setMetadata({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          type: cleanInput.split(';')[0].split(':')[1] || 'Unknown',
-          size: formatBytes(sizeInBytes)
+        setState({
+          base64String: trimmedInput,
+          imageSrc: finalSrc,
+          error: null,
+          fileInfo: {
+            type: finalSrc.split(';')[0].split(':')[1] || 'unknown',
+            size: formatBytes(sizeInBytes),
+            dimensions: `${img.width} × ${img.height} px`,
+          },
         });
       };
 
       img.onerror = () => {
-        setError("Invalid Base64 image data. Please check your string.");
-        setPreviewUrl(null);
-        setMetadata(null);
+        setState(prev => ({ ...prev, base64String: trimmedInput, error: 'Invalid Base64 image data', imageSrc: null, fileInfo: null }));
       };
 
-      img.src = cleanInput;
+      img.src = finalSrc;
     } catch (err) {
-      setError("Failed to decode. Ensure the string is a valid Base64 encoded image.");
-      setPreviewUrl(null);
+      setState(prev => ({ ...prev, base64String: trimmedInput, error: 'Failed to process Base64 string', imageSrc: null, fileInfo: null }));
     }
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      processBase64(input);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [input, processBase64]);
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    decodeBase64(e.target.value);
+  };
+
+  const handleClear = () => {
+    setState({ base64String: '', imageSrc: null, error: null, fileInfo: null });
+  };
 
   const handleDownload = () => {
-    if (!previewUrl) return;
+    if (!state.imageSrc) return;
     const link = document.createElement('a');
-    const extension = metadata?.type.split('/')[1] || 'png';
-    link.href = previewUrl;
-    link.download = `decoded-image-${Date.now()}.${extension}`;
+    link.href = state.imageSrc;
+    link.download = `decoded-image-${Date.now()}.${state.fileInfo?.type.split('/')[1] || 'png'}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const handleCopy = async () => {
-    if (!previewUrl) return;
+  const copyToClipboard = async () => {
     try {
-      // Logic to copy the actual image blob to clipboard
-      const response = await fetch(previewUrl);
-      const blob = await response.blob();
-      await navigator.clipboard.write([
-        new ClipboardItem({ [blob.type]: blob })
-      ]);
-      setCopyStatus(true);
-      setTimeout(() => setCopyStatus(false), 2000);
+      await navigator.clipboard.writeText(state.base64String);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      // Fallback: Copy the base64 string
-      await navigator.clipboard.writeText(input);
-      setCopyStatus(true);
-      setTimeout(() => setCopyStatus(false), 2000);
+      console.error('Failed to copy');
     }
   };
 
-  const clearAll = () => {
-    setInput('');
-    setPreviewUrl(null);
-    setMetadata(null);
-    setError(null);
-  };
-
   return (
-    <div className="min-h-screen bg-[#0f1115] text-slate-200 p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 p-6 md:p-12 font-sans">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <header className="mb-10 text-center">
-          <div className="inline-flex items-center justify-center p-3 mb-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
-            <Layers className="w-8 h-8 text-indigo-400" />
+        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-indigo-500/10 rounded-lg">
+                <ImageIcon className="w-6 h-6 text-indigo-400" />
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent">
+                Base64 Image Decoder
+              </h1>
+            </div>
+            <p className="text-zinc-400 text-sm md:text-base">
+              Transform Base64 strings back into visual assets with instant preview and metadata.
+            </p>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight text-white mb-2 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-            Base64 Image Decoder
-          </h1>
-          <p className="text-slate-400 max-w-lg mx-auto">
-            Convert Base64 strings back into high-quality images. Instant preview, metadata analysis, and optimized downloads.
-          </p>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleClear}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear
+            </button>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Input Section */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Clipboard className="w-4 h-4 text-indigo-400" />
-                Base64 String Input
-              </label>
-              <button 
-                onClick={clearAll}
-                className="text-xs font-semibold text-slate-500 hover:text-rose-400 transition-colors flex items-center gap-1"
-              >
-                <Trash2 className="w-3 h-3" />
-                CLEAR
-              </button>
-            </div>
-            
+          <div className="space-y-4">
             <div className="relative group">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Paste your base64 string here (e.g., data:image/png;base64,...)"
-                className="w-full h-80 bg-[#161b22] border border-slate-800 rounded-xl p-4 text-sm font-mono text-indigo-300 placeholder:text-slate-600 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 outline-none transition-all resize-none shadow-2xl"
-              />
-              <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#161b22] to-transparent pointer-events-none rounded-b-xl"></div>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
+              <div className="relative bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900/50">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Input Base64 String</span>
+                  <button 
+                    onClick={copyToClipboard}
+                    className="p-1.5 hover:bg-zinc-800 rounded-md transition-colors"
+                    title="Copy string"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-zinc-400" />}
+                  </button>
+                </div>
+                <textarea
+                  value={state.base64String}
+                  onChange={handleInputChange}
+                  placeholder="Paste your base64 string here (e.g., data:image/png;base64,...)"
+                  className="w-full h-[400px] bg-transparent p-4 text-sm font-mono text-zinc-300 resize-none focus:outline-none scrollbar-thin scrollbar-thumb-zinc-700"
+                />
+              </div>
             </div>
 
-            {error && (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-rose-500/5 border border-rose-500/20 text-rose-400 animate-in fade-in slide-in-from-top-2 duration-300">
-                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <p className="text-sm">{error}</p>
+            {state.error && (
+              <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                {state.error}
               </div>
             )}
-          </section>
+          </div>
 
           {/* Preview Section */}
-          <section className="space-y-4 h-full">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Maximize2 className="w-4 h-4 text-emerald-400" />
-                Live Preview
-              </label>
-              {metadata && (
-                <span className="text-xs font-bold px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase">
-                  {metadata.type.split('/')[1]}
-                </span>
-              )}
-            </div>
-
-            <div className={`relative w-full h-80 rounded-xl border-2 border-dashed transition-all flex items-center justify-center overflow-hidden
-              ${previewUrl ? 'border-indigo-500/30 bg-[#161b22]' : 'border-slate-800 bg-[#0f1115]'}
-            `}>
-              {previewUrl ? (
-                <div className="relative group w-full h-full flex items-center justify-center p-4">
-                  <img 
-                    src={previewUrl} 
-                    alt="Decoded" 
-                    className="max-w-full max-h-full object-contain rounded-lg shadow-2xl z-10"
-                  />
-                  {/* Grid background for transparency detection */}
-                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(45deg, #808080 25%, transparent 25%), linear-gradient(-45deg, #808080 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #808080 75%), linear-gradient(-45deg, transparent 75%, #808080 75%)', backgroundSize: '20px 20px', backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px' }}></div>
+          <div className="space-y-4">
+            <div className="relative h-full flex flex-col">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-indigo-500 rounded-xl blur opacity-10 transition duration-500"></div>
+              <div className="relative flex-1 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900/50">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Image Preview</span>
+                  {state.imageSrc && (
+                    <button 
+                      onClick={handleDownload}
+                      className="flex items-center gap-2 px-3 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded-md transition-all shadow-lg shadow-indigo-500/20"
+                    >
+                      <Download className="w-3 h-3" />
+                      Download
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <div className="text-center p-8">
-                  <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-800">
-                    <FileImage className="w-8 h-8 text-slate-700" />
+
+                <div className="flex-1 flex items-center justify-center p-8 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+                  {state.imageSrc ? (
+                    <div className="relative group max-w-full max-h-full">
+                      <img 
+                        src={state.imageSrc} 
+                        alt="Decoded output" 
+                        className="max-w-full max-h-[300px] object-contain rounded shadow-2xl transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-zinc-600">
+                      <div className="w-16 h-16 border-2 border-dashed border-zinc-800 rounded-2xl flex items-center justify-center mb-4">
+                        <Maximize2 className="w-8 h-8 opacity-20" />
+                      </div>
+                      <p className="text-sm font-medium">Waiting for valid input...</p>
+                    </div>
+                  )}
+                </div>
+
+                {state.fileInfo && (
+                  <div className="p-4 border-t border-zinc-800 bg-zinc-900/80 grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Format</p>
+                      <p className="text-sm text-zinc-200 font-mono">{state.fileInfo.type}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Size</p>
+                      <p className="text-sm text-zinc-200 font-mono">{state.fileInfo.size}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Dimensions</p>
+                      <p className="text-sm text-zinc-200 font-mono">{state.fileInfo.dimensions}</p>
+                    </div>
                   </div>
-                  <p className="text-slate-500 text-sm italic">Waiting for base64 input...</p>
-                </div>
-              )}
-            </div>
-
-            {/* Actions & Metadata */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={handleCopy}
-                disabled={!previewUrl}
-                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all
-                  ${previewUrl 
-                    ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700' 
-                    : 'bg-slate-900/50 text-slate-600 border border-slate-800/50 cursor-not-allowed'}
-                `}
-              >
-                {copyStatus ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Clipboard className="w-4 h-4" />}
-                {copyStatus ? 'Copied Image' : 'Copy Image'}
-              </button>
-              
-              <button
-                onClick={handleDownload}
-                disabled={!previewUrl}
-                className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all
-                  ${previewUrl 
-                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
-                    : 'bg-slate-900/50 text-slate-600 border border-slate-800/50 cursor-not-allowed'}
-                `}
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-            </div>
-
-            {metadata && (
-              <div className="grid grid-cols-3 gap-4 mt-6 p-4 rounded-xl bg-[#161b22] border border-slate-800 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Dimensions</p>
-                  <p className="text-sm font-mono text-indigo-400">{metadata.width} × {metadata.height}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">File Size</p>
-                  <p className="text-sm font-mono text-indigo-400">{metadata.size}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">MIME Type</p>
-                  <p className="text-sm font-mono text-indigo-400 truncate">{metadata.type}</p>
-                </div>
+                )}
               </div>
-            )}
-          </section>
+            </div>
+          </div>
         </div>
 
-        {/* Instructions/Footer */}
-        <footer className="mt-16 pt-8 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-6 text-xs font-medium text-slate-500">
-            <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Client-side Processing</span>
-            <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> Secure & Private</span>
-          </div>
-          <div className="text-xs text-slate-600">
-            © {new Date().getFullYear()} ImageTools Pro • High-End Image Decoding
-          </div>
+        {/* Footer / Features */}
+        <footer className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { title: 'Secure Decoding', desc: 'Processing happens entirely in your browser. No data ever leaves your device.' },
+            { title: 'Auto-Detection', desc: 'Automatically identifies PNG, JPEG, WEBP, and GIF formats from raw strings.' },
+            { title: 'High Fidelity', desc: 'Maintains original quality and metadata during the decoding process.' }
+          ].map((item, i) => (
+            <div key={i} className="p-4 rounded-xl border border-zinc-800/50 bg-zinc-900/30">
+              <h3 className="text-zinc-200 text-sm font-semibold mb-1">{item.title}</h3>
+              <p className="text-zinc-500 text-xs leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
         </footer>
       </div>
-      
+
       <style jsx global>{`
-        ::-webkit-scrollbar {
-          width: 8px;
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
         }
-        ::-webkit-scrollbar-track {
-          background: #0f1115;
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: transparent;
         }
-        ::-webkit-scrollbar-thumb {
-          background: #1e293b;
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: #27272a;
           border-radius: 10px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-          background: #334155;
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background: #3f3f46;
         }
       `}</style>
     </div>

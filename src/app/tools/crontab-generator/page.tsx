@@ -1,10 +1,6 @@
 'use client';
 
-"use client";
-
-import React, { useState, useEffect, useMemo } from 'react';
-
-type CronPart = 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface CronState {
   minute: string;
@@ -14,46 +10,15 @@ interface CronState {
   dayOfWeek: string;
 }
 
-interface Preset {
-  label: string;
-  value: CronState;
-}
-
-const PRESETS: Preset[] = [
+const PRESETS = [
   { label: 'Every Minute', value: { minute: '*', hour: '*', dayOfMonth: '*', month: '*', dayOfWeek: '*' } },
   { label: 'Every Hour', value: { minute: '0', hour: '*', dayOfMonth: '*', month: '*', dayOfWeek: '*' } },
-  { label: 'Every Night at Midnight', value: { minute: '0', hour: '0', dayOfMonth: '*', month: '*', dayOfWeek: '*' } },
+  { label: 'Every Day at Midnight', value: { minute: '0', hour: '0', dayOfMonth: '*', month: '*', dayOfWeek: '*' } },
   { label: 'Every Sunday at Noon', value: { minute: '0', hour: '12', dayOfMonth: '*', month: '*', dayOfWeek: '0' } },
   { label: 'First Day of Month', value: { minute: '0', hour: '0', dayOfMonth: '1', month: '*', dayOfWeek: '*' } },
 ];
 
-const CronField = ({ 
-  label, 
-  value, 
-  onChange, 
-  placeholder, 
-  description 
-}: { 
-  label: string; 
-  value: string; 
-  onChange: (val: string) => void; 
-  placeholder: string;
-  description: string;
-}) => (
-  <div className="flex flex-col space-y-2">
-    <label className="text-sm font-medium text-zinc-400">{label}</label>
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 px-4 py-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none placeholder:text-zinc-600"
-    />
-    <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{description}</span>
-  </div>
-);
-
-export default function CrontabGenerator() {
+const CrontabGenerator: React.FC = () => {
   const [cron, setCron] = useState<CronState>({
     minute: '*',
     hour: '*',
@@ -61,161 +26,148 @@ export default function CrontabGenerator() {
     month: '*',
     dayOfWeek: '*',
   });
-
   const [copied, setCopied] = useState(false);
+  const [explanation, setExplanation] = useState('');
 
-  const fullCronString = useMemo(() => {
-    return `${cron.minute} ${cron.hour} ${cron.dayOfMonth} ${cron.month} ${cron.dayOfWeek}`;
-  }, [cron]);
+  const cronString = `${cron.minute} ${cron.hour} ${cron.dayOfMonth} ${cron.month} ${cron.dayOfWeek}`;
+
+  const generateExplanation = useCallback((state: CronState) => {
+    const { minute, hour, dayOfMonth, month, dayOfWeek } = state;
+    
+    let desc = "Runs ";
+    
+    if (minute === '*' && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+      return "Runs every minute of every day.";
+    }
+
+    const minPart = minute === '*' ? "every minute" : `at minute ${minute}`;
+    const hourPart = hour === '*' ? "every hour" : `at hour ${hour}`;
+    const dayPart = dayOfMonth === '*' ? "" : `on day of month ${dayOfMonth}`;
+    const monthPart = month === '*' ? "" : `in month ${month}`;
+    const weekPart = dayOfWeek === '*' ? "" : `on day of week ${dayOfWeek}`;
+
+    setExplanation(`${desc} ${minPart} ${hourPart} ${dayPart} ${monthPart} ${weekPart}`.replace(/\s+/g, ' ').trim() + ".");
+  }, []);
+
+  useEffect(() => {
+    generateExplanation(cron);
+  }, [cron, generateExplanation]);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(fullCronString);
+    await navigator.clipboard.writeText(cronString);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const updateField = (field: CronPart, value: string) => {
-    setCron((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const applyPreset = (preset: CronState) => {
-    setCron(preset);
+  const updateField = (field: keyof CronState, value: string) => {
+    setCron(prev => ({ ...prev, [field]: value }));
   };
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 p-6 md:p-12 font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-500 tracking-tight">
+        <header className="mb-12 text-center">
+          <h1 className="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 mb-4">
             Crontab Generator
           </h1>
-          <p className="text-zinc-400 mt-2 text-lg">
-            Create precise schedule expressions for your cron jobs.
-          </p>
-        </div>
+          <p className="text-slate-400 text-lg">Schedule your tasks with precision and elegance.</p>
+        </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Controls */}
-          <div className="lg:col-span-2 space-y-8 bg-zinc-950/50 border border-zinc-800 p-8 rounded-2xl backdrop-blur-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <CronField 
-                label="Minute" 
-                value={cron.minute} 
-                onChange={(v) => updateField('minute', v)} 
-                placeholder="*" 
-                description="0-59, *, /, -"
-              />
-              <CronField 
-                label="Hour" 
-                value={cron.hour} 
-                onChange={(v) => updateField('hour', v)} 
-                placeholder="*" 
-                description="0-23, *, /, -"
-              />
-              <CronField 
-                label="Day of Month" 
-                value={cron.dayOfMonth} 
-                onChange={(v) => updateField('dayOfMonth', v)} 
-                placeholder="*" 
-                description="1-31, *, /, -, L, W"
-              />
-              <CronField 
-                label="Month" 
-                value={cron.month} 
-                onChange={(v) => updateField('month', v)} 
-                placeholder="*" 
-                description="1-12 or JAN-DEC"
-              />
-              <CronField 
-                label="Day of Week" 
-                value={cron.dayOfWeek} 
-                onChange={(v) => updateField('dayOfWeek', v)} 
-                placeholder="*" 
-                description="0-6 or SUN-SAT"
-              />
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-6">Configuration</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {[
+                  { id: 'minute', label: 'Minute', hint: '0-59' },
+                  { id: 'hour', label: 'Hour', hint: '0-23' },
+                  { id: 'dayOfMonth', label: 'Day', hint: '1-31' },
+                  { id: 'month', label: 'Month', hint: '1-12' },
+                  { id: 'dayOfWeek', label: 'Weekday', hint: '0-6' },
+                ].map((field) => (
+                  <div key={field.id} className="space-y-2">
+                    <label className="block text-xs font-medium text-slate-400 px-1">{field.label}</label>
+                    <input
+                      type="text"
+                      value={cron[field.id as keyof CronState]}
+                      onChange={(e) => updateField(field.id as keyof CronState, e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all font-mono text-center"
+                      placeholder="*"
+                    />
+                    <p className="text-[10px] text-slate-600 text-center">{field.hint}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Generated Output */}
-            <div className="mt-10 p-6 bg-zinc-900 border border-zinc-800 rounded-xl relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="font-mono text-2xl md:text-3xl tracking-widest text-blue-400 break-all">
-                  {fullCronString}
-                </div>
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4">Human Readable</h2>
+              <p className="text-lg text-slate-300 italic">
+                "{explanation}"
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm shadow-xl">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4">Quick Presets</h2>
+              <div className="flex flex-col gap-2">
+                {PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => setCron(preset.value)}
+                    className="text-left px-4 py-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800/50 transition-all text-sm text-slate-400 hover:text-indigo-300"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 border border-indigo-500/20 rounded-2xl p-6 backdrop-blur-sm relative overflow-hidden group">
+              <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-all" />
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-indigo-400 mb-4">Generated Cron</h2>
+              <div className="relative group/copy">
+                <code className="block bg-slate-950/80 rounded-xl p-4 text-xl md:text-2xl font-mono text-white text-center border border-white/5 break-all">
+                  {cronString}
+                </code>
                 <button
                   onClick={handleCopy}
-                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 shrink-0 ${
+                  className={`mt-4 w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
                     copied 
-                      ? 'bg-green-500/10 text-green-500 border border-green-500/20' 
-                      : 'bg-zinc-100 text-zinc-900 hover:bg-white'
+                    ? 'bg-emerald-500 text-white' 
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
                   }`}
                 >
                   {copied ? (
                     <>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                      <span>Copied</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Copied!
                     </>
                   ) : (
                     <>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                      <span>Copy Command</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      Copy Command
                     </>
                   )}
                 </button>
               </div>
             </div>
           </div>
-
-          {/* Sidebar Presets */}
-          <div className="space-y-6">
-            <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest px-1">Common Presets</h3>
-            <div className="space-y-3">
-              {PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => applyPreset(preset.value)}
-                  className="w-full text-left p-4 rounded-xl border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all group"
-                >
-                  <div className="text-zinc-200 font-medium group-hover:text-white">{preset.label}</div>
-                  <div className="text-xs font-mono text-zinc-500 mt-1">
-                    {preset.value.minute} {preset.value.hour} {preset.value.dayOfMonth} {preset.value.month} {preset.value.dayOfWeek}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Hint Card */}
-            <div className="p-5 rounded-xl bg-blue-500/5 border border-blue-500/10">
-              <div className="flex items-center space-x-2 text-blue-400 mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <span className="text-xs font-bold uppercase tracking-wider">Format Tip</span>
-              </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Use <code className="text-zinc-200 bg-zinc-800 px-1 rounded">*</code> for every, <code className="text-zinc-200 bg-zinc-800 px-1 rounded">*/5</code> for every five, or <code className="text-zinc-200 bg-zinc-800 px-1 rounded">1-5</code> for ranges.
-              </p>
-            </div>
-          </div>
         </div>
 
-        {/* Legend */}
-        <footer className="mt-16 pt-8 border-t border-zinc-900">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {[
-              { label: 'Minute', range: '0-59' },
-              { label: 'Hour', range: '0-23' },
-              { label: 'Day (M)', range: '1-31' },
-              { label: 'Month', range: '1-12' },
-              { label: 'Day (W)', range: '0-6' },
-            ].map((item) => (
-              <div key={item.label} className="text-center">
-                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-tighter">{item.label}</div>
-                <div className="text-sm text-zinc-400">{item.range}</div>
-              </div>
-            ))}
-          </div>
+        <footer className="mt-16 pt-8 border-t border-slate-900 text-center text-slate-600 text-sm">
+          <p>Standard Crontab format: minute, hour, day of month, month, day of week.</p>
+          <p className="mt-1">All times are typically based on server system time (UTC).</p>
         </footer>
       </div>
     </div>
   );
-}
+};
+
+export default CrontabGenerator;
