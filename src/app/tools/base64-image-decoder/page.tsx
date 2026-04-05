@@ -1,41 +1,30 @@
 'use client';
 
-"use client";
-
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   Image as ImageIcon, 
-  Copy, 
   Trash2, 
   Download, 
-  Upload, 
+  Copy, 
   Check, 
-  AlertCircle,
+  AlertCircle, 
+  Upload,
   Maximize2
 } from 'lucide-react';
 
-interface DecoderState {
-  base64String: string;
-  imageSrc: string | null;
-  error: string | null;
-  fileInfo: {
-    type: string;
-    size: string;
-    dimensions: string;
-  } | null;
+interface ImageMetadata {
+  width: number;
+  height: number;
+  type: string;
+  size: string;
 }
 
 const Base64ImageDecoder: React.FC = () => {
-  const [state, setState] = useState<DecoderState>({
-    base64String: '',
-    imageSrc: null,
-    error: null,
-    fileInfo: null,
-  });
-  
-  const [copied, setCopied] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [inputValue, setInputValue] = useState<string>('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<boolean>(false);
+  const [metadata, setMetadata] = useState<ImageMetadata | null>(null);
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -45,232 +34,215 @@ const Base64ImageDecoder: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const decodeBase64 = useCallback((input: string) => {
-    const trimmedInput = input.trim();
-    if (!trimmedInput) {
-      setState({ base64String: '', imageSrc: null, error: null, fileInfo: null });
+  const decodeBase64 = useCallback((value: string) => {
+    setError(null);
+    if (!value.trim()) {
+      setPreviewUrl(null);
+      setMetadata(null);
       return;
     }
 
     try {
-      // Validate if it has a prefix, if not, try to guess or just use as is
-      let finalSrc = trimmedInput;
-      if (!trimmedInput.startsWith('data:image/')) {
-        // Attempt to detect common formats if prefix is missing
-        if (trimmedInput.startsWith('/9j/')) finalSrc = `data:image/jpeg;base64,${trimmedInput}`;
-        else if (trimmedInput.startsWith('iVBORw0KGgo')) finalSrc = `data:image/png;base64,${trimmedInput}`;
-        else if (trimmedInput.startsWith('R0lGODlh')) finalSrc = `data:image/gif;base64,${trimmedInput}`;
-        else if (trimmedInput.startsWith('UklGR')) finalSrc = `data:image/webp;base64,${trimmedInput}`;
-        else finalSrc = `data:image/png;base64,${trimmedInput}`;
+      // Clean the input (remove whitespace/newlines)
+      const cleanString = value.trim().replace(/\s/g, '');
+      
+      // Ensure it has the data prefix, add if missing (defaulting to png)
+      let formattedString = cleanString;
+      if (!cleanString.startsWith('data:image/')) {
+        formattedString = `data:image/png;base64,${cleanString}`;
       }
 
       const img = new Image();
       img.onload = () => {
-        // Calculate size from base64 string
-        const stringLength = trimmedInput.length - (trimmedInput.indexOf(',') + 1);
-        const sizeInBytes = Math.ceil((stringLength * 3) / 4);
-
-        setState({
-          base64String: trimmedInput,
-          imageSrc: finalSrc,
-          error: null,
-          fileInfo: {
-            type: finalSrc.split(';')[0].split(':')[1] || 'unknown',
-            size: formatBytes(sizeInBytes),
-            dimensions: `${img.width} × ${img.height} px`,
-          },
+        setPreviewUrl(formattedString);
+        setMetadata({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          type: formattedString.split(';')[0].split(':')[1],
+          size: formatBytes(Math.round((cleanString.length * 3) / 4))
         });
       };
-
       img.onerror = () => {
-        setState(prev => ({ ...prev, base64String: trimmedInput, error: 'Invalid Base64 image data', imageSrc: null, fileInfo: null }));
+        setError('Invalid Base64 image data. Please check the format.');
+        setPreviewUrl(null);
+        setMetadata(null);
       };
-
-      img.src = finalSrc;
-    } catch (err) {
-      setState(prev => ({ ...prev, base64String: trimmedInput, error: 'Failed to process Base64 string', imageSrc: null, fileInfo: null }));
+      img.src = formattedString;
+    } catch (e) {
+      setError('Failed to process string. Ensure it is valid Base64.');
+      setPreviewUrl(null);
     }
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    decodeBase64(e.target.value);
+    const value = e.target.value;
+    setInputValue(value);
+    decodeBase64(value);
   };
 
   const handleClear = () => {
-    setState({ base64String: '', imageSrc: null, error: null, fileInfo: null });
+    setInputValue('');
+    setPreviewUrl(null);
+    setError(null);
+    setMetadata(null);
   };
 
   const handleDownload = () => {
-    if (!state.imageSrc) return;
+    if (!previewUrl) return;
     const link = document.createElement('a');
-    link.href = state.imageSrc;
-    link.download = `decoded-image-${Date.now()}.${state.fileInfo?.type.split('/')[1] || 'png'}`;
+    link.href = previewUrl;
+    link.download = `decoded-image-${Date.now()}.${metadata?.type.split('/')[1] || 'png'}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const copyToClipboard = async () => {
+  const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(state.base64String);
+      await navigator.clipboard.writeText(inputValue);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy');
+      console.error('Failed to copy text');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 p-6 md:p-12 font-sans">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#0a0a0c] text-slate-200 p-6 font-sans">
+      <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
-        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-indigo-500/10 rounded-lg">
-                <ImageIcon className="w-6 h-6 text-indigo-400" />
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent">
-                Base64 Image Decoder
-              </h1>
+        <header className="flex flex-col space-y-2">
+          <div className="inline-flex items-center space-x-3">
+            <div className="p-2 bg-indigo-500/10 rounded-lg">
+              <ImageIcon className="w-6 h-6 text-indigo-400" />
             </div>
-            <p className="text-zinc-400 text-sm md:text-base">
-              Transform Base64 strings back into visual assets with instant preview and metadata.
-            </p>
+            <h1 className="text-3xl font-bold tracking-tight text-white">
+              Base64 Image Decoder
+            </h1>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleClear}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear
-            </button>
-          </div>
+          <p className="text-slate-400 max-w-2xl">
+            Convert Base64 encoded strings back into visual images. High-performance decoding with instant preview and metadata extraction.
+          </p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Input Section */}
-          <div className="space-y-4">
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
-              <div className="relative bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900/50">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Input Base64 String</span>
-                  <button 
-                    onClick={copyToClipboard}
-                    className="p-1.5 hover:bg-zinc-800 rounded-md transition-colors"
-                    title="Copy string"
-                  >
-                    {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-zinc-400" />}
-                  </button>
-                </div>
-                <textarea
-                  value={state.base64String}
-                  onChange={handleInputChange}
-                  placeholder="Paste your base64 string here (e.g., data:image/png;base64,...)"
-                  className="w-full h-[400px] bg-transparent p-4 text-sm font-mono text-zinc-300 resize-none focus:outline-none scrollbar-thin scrollbar-thumb-zinc-700"
-                />
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Base64 String Input
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCopy}
+                  disabled={!inputValue}
+                  className="p-2 hover:bg-slate-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                  title="Copy Input"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={handleClear}
+                  className="p-2 hover:bg-red-500/10 hover:text-red-400 rounded-md transition-colors text-slate-400"
+                  title="Clear Input"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            {state.error && (
-              <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                <AlertCircle className="w-5 h-5 shrink-0" />
-                {state.error}
-              </div>
-            )}
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
+              <textarea
+                value={inputValue}
+                onChange={handleInputChange}
+                placeholder="Paste your Base64 string here (e.g., data:image/png;base64,...)"
+                className="relative w-full h-[500px] bg-[#121214] border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all resize-none"
+              />
+            </div>
           </div>
 
           {/* Preview Section */}
-          <div className="space-y-4">
-            <div className="relative h-full flex flex-col">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-indigo-500 rounded-xl blur opacity-10 transition duration-500"></div>
-              <div className="relative flex-1 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900/50">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Image Preview</span>
-                  {state.imageSrc && (
-                    <button 
-                      onClick={handleDownload}
-                      className="flex items-center gap-2 px-3 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded-md transition-all shadow-lg shadow-indigo-500/20"
-                    >
-                      <Download className="w-3 h-3" />
-                      Download
-                    </button>
-                  )}
-                </div>
+          <div className="flex flex-col space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <Maximize2 className="w-4 h-4" />
+                Live Preview
+              </label>
+              {previewUrl && (
+                <button
+                  onClick={handleDownload}
+                  className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-indigo-500/20"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Image
+                </button>
+              )}
+            </div>
 
-                <div className="flex-1 flex items-center justify-center p-8 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
-                  {state.imageSrc ? (
-                    <div className="relative group max-w-full max-h-full">
-                      <img 
-                        src={state.imageSrc} 
-                        alt="Decoded output" 
-                        className="max-w-full max-h-[300px] object-contain rounded shadow-2xl transition-transform duration-300 group-hover:scale-[1.02]"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center text-zinc-600">
-                      <div className="w-16 h-16 border-2 border-dashed border-zinc-800 rounded-2xl flex items-center justify-center mb-4">
-                        <Maximize2 className="w-8 h-8 opacity-20" />
-                      </div>
-                      <p className="text-sm font-medium">Waiting for valid input...</p>
-                    </div>
-                  )}
+            <div className="relative h-[500px] w-full bg-[#121214] border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+              {error ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                  <AlertCircle className="w-12 h-12 text-red-500/50" />
+                  <p className="text-red-400 font-medium">{error}</p>
                 </div>
-
-                {state.fileInfo && (
-                  <div className="p-4 border-t border-zinc-800 bg-zinc-900/80 grid grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Format</p>
-                      <p className="text-sm text-zinc-200 font-mono">{state.fileInfo.type}</p>
+              ) : previewUrl ? (
+                <div className="flex-1 flex flex-col">
+                  <div className="flex-1 relative bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] flex items-center justify-center overflow-auto p-8">
+                    <img
+                      src={previewUrl}
+                      alt="Decoded preview"
+                      className="max-w-full max-h-full object-contain shadow-2xl rounded shadow-black/50"
+                    />
+                  </div>
+                  
+                  {/* Metadata Footer */}
+                  <div className="bg-[#1a1a1e] border-t border-slate-800 p-4 grid grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Dimensions</p>
+                      <p className="text-sm text-slate-200 font-mono">{metadata?.width} × {metadata?.height} px</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Size</p>
-                      <p className="text-sm text-zinc-200 font-mono">{state.fileInfo.size}</p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Mime Type</p>
+                      <p className="text-sm text-slate-200 font-mono">{metadata?.type}</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Dimensions</p>
-                      <p className="text-sm text-zinc-200 font-mono">{state.fileInfo.dimensions}</p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">File Size</p>
+                      <p className="text-sm text-slate-200 font-mono">{metadata?.size}</p>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
+                  <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-slate-700" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-slate-400 font-medium">No image decoded</p>
+                    <p className="text-sm text-slate-600">Enter a valid Base64 string to see the preview</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Footer / Features */}
-        <footer className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { title: 'Secure Decoding', desc: 'Processing happens entirely in your browser. No data ever leaves your device.' },
-            { title: 'Auto-Detection', desc: 'Automatically identifies PNG, JPEG, WEBP, and GIF formats from raw strings.' },
-            { title: 'High Fidelity', desc: 'Maintains original quality and metadata during the decoding process.' }
-          ].map((item, i) => (
-            <div key={i} className="p-4 rounded-xl border border-zinc-800/50 bg-zinc-900/30">
-              <h3 className="text-zinc-200 text-sm font-semibold mb-1">{item.title}</h3>
-              <p className="text-zinc-500 text-xs leading-relaxed">{item.desc}</p>
-            </div>
-          ))}
+        {/* Footer Info */}
+        <footer className="pt-8 border-t border-slate-900 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-sm">
+          <p>© 2024 Premium Dev Tools. Secure client-side decoding.</p>
+          <div className="flex items-center gap-6">
+            <span className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+              Local Processing
+            </span>
+            <span className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+              Private & Secure
+            </span>
+          </div>
         </footer>
       </div>
-
-      <style jsx global>{`
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 6px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background: #27272a;
-          border-radius: 10px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background: #3f3f46;
-        }
-      `}</style>
     </div>
   );
 };

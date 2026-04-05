@@ -1,37 +1,22 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Check, ShieldCheck, AlertCircle, Terminal, Key, Database, Cpu } from 'lucide-react';
+import { Copy, Check, ShieldAlert, ShieldCheck, Terminal, Cpu, Lock } from 'lucide-react';
 
-interface JWTHeader {
-  alg: string;
-  typ?: string;
-  kid?: string;
-  [key: string]: any;
-}
-
-interface JWTPayload {
-  iss?: string;
-  sub?: string;
-  aud?: string | string[];
-  exp?: number;
-  nbf?: number;
-  iat?: number;
-  jti?: string;
-  [key: string]: any;
-}
-
-interface DecodedJWT {
-  header: JWTHeader | null;
-  payload: JWTPayload | null;
+interface JWTParts {
+  header: object | null;
+  payload: object | null;
   signature: string | null;
+}
+
+interface DecodedState extends JWTParts {
   isValid: boolean;
   error: string | null;
 }
 
 const JWTDebugger: React.FC = () => {
-  const [token, setToken] = useState<string>('');
-  const [decoded, setDecoded] = useState<DecodedJWT>({
+  const [inputToken, setInputToken] = useState<string>('');
+  const [decoded, setDecoded] = useState<DecodedState>({
     header: null,
     payload: null,
     signature: null,
@@ -44,24 +29,25 @@ const JWTDebugger: React.FC = () => {
     try {
       const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
       const jsonPayload = decodeURIComponent(
-        atob(base64)
+        window
+          .atob(base64)
           .split('')
           .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
           .join('')
       );
       return jsonPayload;
     } catch (e) {
-      throw new Error('Invalid Base64 encoding');
+      throw new Error('Invalid Base64 string');
     }
   };
 
-  const handleDecode = useCallback((inputToken: string) => {
-    if (!inputToken.trim()) {
+  const handleDecode = useCallback((token: string) => {
+    if (!token) {
       setDecoded({ header: null, payload: null, signature: null, isValid: false, error: null });
       return;
     }
 
-    const parts = inputToken.split('.');
+    const parts = token.split('.');
     if (parts.length !== 3) {
       setDecoded((prev) => ({ ...prev, isValid: false, error: 'JWT must have 3 parts separated by dots' }));
       return;
@@ -80,13 +66,13 @@ const JWTDebugger: React.FC = () => {
         error: null,
       });
     } catch (err) {
-      setDecoded((prev) => ({ ...prev, isValid: false, error: 'Failed to decode token segments' }));
+      setDecoded((prev) => ({ ...prev, isValid: false, error: 'Failed to decode parts. Ensure valid JWT format.' }));
     }
   }, []);
 
   useEffect(() => {
-    handleDecode(token);
-  }, [token, handleDecode]);
+    handleDecode(inputToken);
+  }, [inputToken, handleDecode]);
 
   const copyToClipboard = async (text: string, section: string) => {
     try {
@@ -98,160 +84,149 @@ const JWTDebugger: React.FC = () => {
     }
   };
 
-  const getTokenColor = (part: number) => {
-    if (part === 0) return 'text-rose-400';
-    if (part === 1) return 'text-violet-400';
-    return 'text-sky-400';
-  };
-
-  const JsonDisplay = ({ data, title, icon: Icon, colorClass }: { data: any, title: string, icon: any, colorClass: string }) => (
-    <div className="group relative flex flex-col w-full bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden backdrop-blur-sm">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
-        <div className="flex items-center gap-2">
-          <Icon size={16} className={colorClass} />
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{title}</span>
-        </div>
+  const CodeBlock = ({ title, data, colorClass }: { title: string; data: any; colorClass: string }) => (
+    <div className="relative group rounded-xl border border-white/5 bg-[#121212] overflow-hidden transition-all hover:border-white/10 shadow-2xl">
+      <div className={`absolute top-0 left-0 w-1 h-full ${colorClass}`} />
+      <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/5">
+        <span className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+          <Cpu size={14} className={colorClass.replace('bg-', 'text-')} />
+          {title}
+        </span>
         <button
           onClick={() => copyToClipboard(JSON.stringify(data, null, 2), title)}
-          className="p-1.5 hover:bg-slate-800 rounded-md transition-colors text-slate-500 hover:text-white"
+          className="p-1.5 hover:bg-white/10 rounded-md transition-colors text-gray-400 hover:text-white"
         >
           {copiedSection === title ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
         </button>
       </div>
-      <div className="p-4 overflow-auto max-h-[300px] font-mono text-sm leading-relaxed">
-        <pre className="text-slate-300">
-          {data ? JSON.stringify(data, null, 2) : <span className="text-slate-600 italic">// No data available</span>}
+      <div className="p-5 overflow-x-auto">
+        <pre className="text-sm font-mono leading-relaxed">
+          {data ? (
+            <code className="text-gray-300">
+              {Object.entries(data).map(([key, value], i) => (
+                <div key={key} className="group/line">
+                  <span className="text-pink-400">"{key}"</span>
+                  <span className="text-white">: </span>
+                  <span className={typeof value === 'string' ? 'text-emerald-400' : 'text-amber-400'}>
+                    {typeof value === 'string' ? `"${value}"` : String(value)}
+                  </span>
+                  {i < Object.entries(data).length - 1 && <span className="text-gray-500">,</span>}
+                </div>
+              ))}
+            </code>
+          ) : (
+            <span className="text-gray-600 italic">Waiting for valid input...</span>
+          )}
         </pre>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#0a0a0a] text-gray-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <header className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/20">
-              <ShieldCheck className="text-white" size={24} />
+        <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-indigo-600 rounded-lg shadow-[0_0_20px_rgba(79,70,229,0.4)]">
+                <Terminal size={24} className="text-white" />
+              </div>
+              <h1 className="text-3xl font-black tracking-tighter text-white">
+                JWT<span className="text-indigo-500">DEBUGGER</span>
+              </h1>
             </div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-500">
-              JWT Debugger
-            </h1>
+            <p className="text-gray-500 text-sm font-medium">Professional grade JSON Web Token inspector & validator.</p>
           </div>
-          <p className="text-slate-400 text-sm max-w-2xl">
-            Inspect, decode and verify JSON Web Tokens with a secure, client-side only interface. 
-            All processing happens locally in your browser.
-          </p>
+          
+          <div className="flex items-center gap-4">
+            <div className={`px-4 py-2 rounded-full border text-xs font-bold flex items-center gap-2 transition-all duration-500 ${
+              decoded.isValid 
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                : 'bg-red-500/10 border-red-500/20 text-red-400'
+            }`}>
+              {decoded.isValid ? <ShieldCheck size={16} /> : <ShieldAlert size={16} />}
+              {decoded.isValid ? 'TOKEN VALIDATED' : 'INVALID STRUCTURE'}
+            </div>
+          </div>
         </header>
 
-        <main className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left Column: Input */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Input Section */}
+          <div className="space-y-6">
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-fuchsia-500 rounded-2xl blur opacity-10 group-focus-within:opacity-20 transition duration-500"></div>
-              <div className="relative flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900/50">
-                  <div className="flex items-center gap-2">
-                    <Terminal size={16} className="text-indigo-400" />
-                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Encoded Token</span>
-                  </div>
-                  {decoded.isValid && (
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Valid Format
-                    </span>
-                  )}
-                </div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1">
+                Encoded Token
+              </label>
+              <div className="relative">
                 <textarea
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  placeholder="Paste your JWT here (header.payload.signature)"
-                  className="w-full h-[500px] p-6 bg-transparent text-slate-300 font-mono text-sm resize-none focus:outline-none placeholder:text-slate-700 leading-relaxed break-all"
-                  spellCheck={false}
+                  value={inputToken}
+                  onChange={(e) => setInputToken(e.target.value)}
+                  placeholder="Paste your JWT here..."
+                  className="w-full h-[500px] bg-[#121212] border border-white/5 rounded-2xl p-6 text-sm font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 outline-none transition-all resize-none shadow-inner leading-relaxed text-indigo-300"
+                  spellCheck="false"
                 />
+                <div className="absolute bottom-4 right-4 flex gap-2">
+                    <button 
+                        onClick={() => setInputToken('')}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition-all"
+                    >
+                        CLEAR
+                    </button>
+                </div>
               </div>
             </div>
 
             {decoded.error && (
-              <div className="flex items-start gap-3 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
-                <AlertCircle className="text-rose-500 shrink-0" size={18} />
-                <p className="text-sm text-rose-200/80">{decoded.error}</p>
+              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
+                <ShieldAlert className="text-red-500 mt-0.5" size={18} />
+                <p className="text-sm text-red-400 font-medium">{decoded.error}</p>
               </div>
             )}
           </div>
 
-          {/* Right Column: Output */}
-          <div className="lg:col-span-7 flex flex-col gap-6">
-            <JsonDisplay 
-              data={decoded.header} 
+          {/* Output Section */}
+          <div className="space-y-6">
+            <CodeBlock 
               title="Header" 
-              icon={Cpu} 
-              colorClass="text-rose-400" 
+              data={decoded.header} 
+              colorClass="bg-pink-500" 
             />
             
-            <JsonDisplay 
-              data={decoded.payload} 
+            <CodeBlock 
               title="Payload" 
-              icon={Database} 
-              colorClass="text-violet-400" 
+              data={decoded.payload} 
+              colorClass="bg-indigo-500" 
             />
 
-            <div className="flex flex-col w-full bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden backdrop-blur-sm">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
-                <div className="flex items-center gap-2">
-                  <Key size={16} className="text-sky-400" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Signature</span>
-                </div>
+            <div className="relative group rounded-xl border border-white/5 bg-[#121212] overflow-hidden transition-all hover:border-white/10 shadow-2xl">
+              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
+              <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-b border-white/5">
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                  <Lock size={14} className="text-emerald-500" />
+                  Signature
+                </span>
               </div>
-              <div className="p-5 font-mono text-xs">
-                {decoded.signature ? (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-slate-950/50 border border-slate-800 rounded-lg break-all text-sky-400/80">
-                      HMACSHA256(
-                        base64UrlEncode(header) + "." +
-                        base64UrlEncode(payload),
-                        <span className="text-slate-500 italic">your-256-bit-secret</span>
-                      )
-                    </div>
-                    <div className="text-slate-500 text-[10px] leading-relaxed">
-                      Signature is used to verify that the sender of the JWT is who it says it is and to ensure that the message wasn't changed along the way.
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-slate-600 italic">No signature detected</span>
-                )}
+              <div className="p-5">
+                <p className="text-xs font-mono text-emerald-500/80 break-all leading-relaxed">
+                  {decoded.signature ? (
+                    `HMACSHA256(\n  base64UrlEncode(header) + "." +\n  base64UrlEncode(payload),\n  your-256-bit-secret\n)`
+                  ) : (
+                    <span className="text-gray-600 italic">Signature will be computed after valid input</span>
+                  )}
+                </p>
               </div>
             </div>
           </div>
-        </main>
+        </div>
 
-        <footer className="pt-12 border-t border-slate-900 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-xs">
-          <p>© {new Date().getFullYear()} JWT Debugger — Professional Grade Security Tool</p>
-          <div className="flex gap-6">
-            <span className="hover:text-indigo-400 cursor-pointer transition-colors">Documentation</span>
-            <span className="hover:text-indigo-400 cursor-pointer transition-colors">RFC 7519</span>
-            <span className="hover:text-indigo-400 cursor-pointer transition-colors">Privacy</span>
-          </div>
+        {/* Footer info */}
+        <footer className="mt-16 pt-8 border-t border-white/5 text-center">
+            <p className="text-gray-600 text-xs font-medium tracking-widest uppercase">
+                Secure Client-Side Decoding • No Data Transmitted to Servers
+            </p>
         </footer>
       </div>
-
-      <style jsx global>{`
-        ::-webkit-scrollbar {
-          width: 6px;
-          height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-          background: #1e293b;
-          border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: #334155;
-        }
-      `}</style>
     </div>
   );
 };

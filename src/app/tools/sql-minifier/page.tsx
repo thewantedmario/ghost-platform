@@ -2,194 +2,252 @@
 
 "use client";
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { Copy, Trash2, Zap, Check, Terminal, Database, Sparkles } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { 
+  Copy, 
+  Trash2, 
+  Zap, 
+  Check, 
+  AlertCircle, 
+  FileCode, 
+  Terminal,
+  Maximize2,
+  Minimize2
+} from 'lucide-react';
 
-interface SQLMinifierProps {
-  className?: string;
+interface SQLMinifierState {
+  input: string;
+  output: string;
+  isCopying: boolean;
+  error: string | null;
+  stats: {
+    originalSize: number;
+    minifiedSize: number;
+    reduction: string;
+  };
 }
 
-const SQLMinifier: React.FC<SQLMinifierProps> = ({ className = "" }) => {
-  const [input, setInput] = useState<string>("");
-  const [output, setOutput] = useState<string>("");
-  const [isCopied, setIsCopied] = useState<boolean>(false);
-  const [stats, setStats] = useState<{ original: number; minified: number; savings: number }>({
-    original: 0,
-    minified: 0,
-    savings: 0,
+export default function SQLMinifier() {
+  const [state, setState] = useState<SQLMinifierState>({
+    input: '',
+    output: '',
+    isCopying: false,
+    error: null,
+    stats: {
+      originalSize: 0,
+      minifiedSize: 0,
+      reduction: '0'
+    }
   });
 
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+
   const minifySQL = (sql: string): string => {
-    if (!sql) return "";
+    if (!sql.trim()) return '';
 
-    let minified = sql
+    return sql
       // Remove multi-line comments
-      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
       // Remove single-line comments (starting with -- or #)
-      .replace(/(--|#).*?(\n|$)/g, " ")
+      .replace(/(--|#).*?(\n|$)/g, ' ')
       // Replace newlines and tabs with spaces
-      .replace(/[\r\n\t]+/g, " ")
-      // Collapse multiple spaces
-      .replace(/\s+/g, " ")
-      // Remove spaces around commas and operators for tighter minification
-      .replace(/\s*([,;()=<>!+*/-])\s*/g, "$1")
-      // Final trim
+      .replace(/[\n\r\t]+/g, ' ')
+      // Collapse multiple spaces into one
+      .replace(/\s{2,}/g, ' ')
+      // Remove spaces around special characters (comma, parens, operators)
+      .replace(/\s?([,()=<>!+*/-])\s?/g, '$1')
       .trim();
-
-    return minified;
   };
 
   const handleProcess = useCallback(() => {
-    const result = minifySQL(input);
-    setOutput(result);
+    try {
+      const minified = minifySQL(state.input);
+      const originalSize = new Blob([state.input]).size;
+      const minifiedSize = new Blob([minified]).size;
+      const reduction = originalSize > 0 
+        ? (((originalSize - minifiedSize) / originalSize) * 100).toFixed(1) 
+        : '0';
 
-    const originalSize = new Blob([input]).size;
-    const minifiedSize = new Blob([result]).size;
-    const savings = originalSize > 0 ? ((originalSize - minifiedSize) / originalSize) * 100 : 0;
-
-    setStats({
-      original: originalSize,
-      minified: minifiedSize,
-      savings: Math.max(0, Math.round(savings)),
-    });
-  }, [input]);
+      setState(prev => ({
+        ...prev,
+        output: minified,
+        error: null,
+        stats: {
+          originalSize,
+          minifiedSize,
+          reduction
+        }
+      }));
+    } catch (err) {
+      setState(prev => ({ ...prev, error: "Failed to process SQL. Please check your syntax." }));
+    }
+  }, [state.input]);
 
   const handleCopy = async () => {
-    if (!output) return;
-    await navigator.clipboard.writeText(output);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+    if (!state.output) return;
+    try {
+      await navigator.clipboard.writeText(state.output);
+      setState(prev => ({ ...prev, isCopying: true }));
+      setTimeout(() => setState(prev => ({ ...prev, isCopying: false })), 2000);
+    } catch (err) {
+      setState(prev => ({ ...prev, error: "Failed to copy to clipboard" }));
+    }
   };
 
   const handleClear = () => {
-    setInput("");
-    setOutput("");
-    setStats({ original: 0, minified: 0, savings: 0 });
+    setState({
+      input: '',
+      output: '',
+      isCopying: false,
+      error: null,
+      stats: { originalSize: 0, minifiedSize: 0, reduction: '0' }
+    });
   };
 
-  useEffect(() => {
-    if (input.length > 0) {
-      handleProcess();
-    } else {
-      setOutput("");
-      setStats({ original: 0, minified: 0, savings: 0 });
-    }
-  }, [input, handleProcess]);
-
   return (
-    <div className={`w-full max-w-6xl mx-auto p-4 md:p-8 bg-slate-950 text-slate-200 selection:bg-indigo-500/30 ${className}`}>
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-600/10 rounded-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-            <Database className="w-6 h-6 text-indigo-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">SQL Minifier</h1>
-            <p className="text-slate-400 text-sm">Compress your queries for production efficiency.</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleClear}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-all"
-          >
-            <Trash2 className="w-4 h-4" />
-            Clear
-          </button>
-          <button
-            onClick={handleCopy}
-            disabled={!output}
-            className={`flex items-center gap-2 px-5 py-2 text-sm font-bold rounded-lg transition-all active:scale-95 ${
-              isCopied 
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" 
-                : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            }`}
-          >
-            {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            {isCopied ? "Copied!" : "Copy Minified"}
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Input Area */}
-        <div className="group relative">
-          <div className="absolute -inset-0.5 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-500"></div>
-          <div className="relative flex flex-col h-[500px] bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-900/50">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                <Terminal className="w-3 h-3" /> Input SQL
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                {input.length} characters
-              </span>
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
+      <div className="max-w-6xl mx-auto">
+        {/* Header Section */}
+        <header className="mb-8 space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/20">
+              <Terminal className="w-6 h-6 text-white" />
             </div>
-            <textarea
-              className="flex-1 w-full p-4 bg-transparent text-slate-300 font-mono text-sm resize-none focus:outline-none focus:ring-0 placeholder:text-slate-700"
-              placeholder="SELECT * FROM users WHERE status = 'active' -- Get active users..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              spellCheck={false}
-            />
+            <h1 className="text-3xl font-bold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+              SQL Minifier <span className="text-indigo-500 font-mono text-sm ml-2 px-2 py-1 bg-indigo-500/10 rounded border border-indigo-500/20">v1.0</span>
+            </h1>
           </div>
-        </div>
+          <p className="text-slate-400 text-sm md:text-base max-w-2xl">
+            Compress your SQL queries for optimal transmission and storage. 
+            Removes comments, white spaces, and newlines without breaking logic.
+          </p>
+        </header>
 
-        {/* Output Area */}
-        <div className="group relative">
-          <div className="absolute -inset-0.5 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-500"></div>
-          <div className="relative flex flex-col h-[500px] bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-900/50">
-              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
-                <Zap className="w-3 h-3" /> Minified Output
-              </span>
-              {stats.savings > 0 && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Reduced by {stats.savings}%
-                </span>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Input Panel */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
+                <FileCode className="w-4 h-4 text-indigo-400" />
+                Raw SQL Input
+              </label>
+              <button 
+                onClick={handleClear}
+                className="text-xs flex items-center gap-1.5 text-slate-500 hover:text-red-400 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear
+              </button>
             </div>
-            <textarea
-              readOnly
-              className="flex-1 w-full p-4 bg-transparent text-indigo-200 font-mono text-sm resize-none focus:outline-none focus:ring-0 placeholder:text-slate-700"
-              placeholder="SELECT*FROM users WHERE status='active'"
-              value={output}
-            />
-            {output && (
-              <div className="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur-sm">
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <div className="flex gap-4">
-                    <span>Original: <b className="text-slate-300">{stats.original} B</b></span>
-                    <span>Minified: <b className="text-indigo-400">{stats.minified} B</b></span>
-                  </div>
-                  <div className="flex items-center gap-1 text-emerald-400">
-                    <Sparkles className="w-3 h-3" />
-                    <span>Optimized</span>
+            <div className="relative group h-[400px]">
+              <textarea
+                ref={textAreaRef}
+                value={state.input}
+                onChange={(e) => setState(prev => ({ ...prev, input: e.target.value }))}
+                placeholder="Paste your SQL here... e.g. SELECT * FROM users WHERE status = 'active';"
+                className="w-full h-full bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40 transition-all resize-none placeholder:text-slate-700"
+              />
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-indigo-500/5 to-transparent pointer-events-none" />
+            </div>
+            <button
+              onClick={handleProcess}
+              disabled={!state.input}
+              className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/20"
+            >
+              <Zap className="w-5 h-5 fill-current" />
+              Minify SQL
+            </button>
+          </div>
+
+          {/* Output Panel */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
+                <Minimize2 className="w-4 h-4 text-emerald-400" />
+                Minified Output
+              </label>
+              <div className="flex items-center gap-4">
+                {state.stats.originalSize > 0 && (
+                   <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    -{state.stats.reduction}% Saved
+                   </span>
+                )}
+                <button 
+                  onClick={handleCopy}
+                  disabled={!state.output}
+                  className={`text-xs flex items-center gap-1.5 transition-colors ${state.isCopying ? 'text-emerald-400' : 'text-indigo-400 hover:text-indigo-300 disabled:text-slate-600'}`}
+                >
+                  {state.isCopying ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {state.isCopying ? 'Copied!' : 'Copy Results'}
+                </button>
+              </div>
+            </div>
+            <div className="relative h-[400px]">
+              <textarea
+                readOnly
+                value={state.output}
+                placeholder="Your minified code will appear here..."
+                className="w-full h-full bg-slate-900/50 border border-slate-800 rounded-xl p-4 font-mono text-sm text-emerald-400/90 focus:outline-none transition-all resize-none placeholder:text-slate-700"
+              />
+              {!state.output && !state.error && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-center space-y-2">
+                    <Maximize2 className="w-8 h-8 text-slate-800 mx-auto" />
+                    <p className="text-slate-700 text-xs">Ready for input</p>
                   </div>
                 </div>
+              )}
+            </div>
+            
+            {/* Stats Dashboard */}
+            <div className="grid grid-cols-3 gap-4 h-[72px]">
+              <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col justify-center">
+                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Original</span>
+                <span className="text-sm font-mono text-slate-300">{state.stats.originalSize} B</span>
               </div>
-            )}
+              <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col justify-center">
+                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Minified</span>
+                <span className="text-sm font-mono text-emerald-400">{state.stats.minifiedSize} B</span>
+              </div>
+              <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-3 flex flex-col justify-center">
+                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Efficiency</span>
+                <span className="text-sm font-mono text-indigo-400">{state.stats.reduction}%</span>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Error Notification */}
+        {state.error && (
+          <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm animate-in fade-in slide-in-from-top-2">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            {state.error}
+          </div>
+        )}
+
+        {/* Footer info */}
+        <footer className="mt-12 pt-8 border-t border-slate-900 text-center">
+          <p className="text-slate-600 text-xs font-mono">
+            Secure processing • No data leaves your browser • MIT Licensed
+          </p>
+        </footer>
       </div>
 
-      {/* Features/Footer */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { title: "Strip Comments", desc: "Removes -- and /* */ comments automatically." },
-          { title: "Whitespace Removal", desc: "Collapses redundant spaces and newlines." },
-          { title: "Operator Packing", desc: "Trims spaces around arithmetic and logic symbols." }
-        ].map((feat, i) => (
-          <div key={i} className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/60">
-            <h3 className="text-sm font-bold text-slate-300 mb-1">{feat.title}</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">{feat.desc}</p>
-          </div>
-        ))}
-      </div>
+      <style jsx global>{`
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #020617;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #1e293b;
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #334155;
+        }
+      `}</style>
     </div>
   );
-};
-
-export default SQLMinifier;
+}
