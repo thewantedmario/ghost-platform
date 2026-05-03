@@ -1,245 +1,253 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Check, Trash2, FileCode, Eye, Zap, Info } from 'lucide-react';
+import { Copy, Check, Trash2, Image as ImageIcon, Code, ExternalLink, Zap, Download } from 'lucide-react';
 
-type EncodingType = 'utf8' | 'base64';
-
-interface ConversionOptions {
-  encoding: EncodingType;
-  useUrlFunction: boolean;
+interface ConversionResult {
+  base64: string;
+  encoded: string;
+  css: string;
+  markdown: string;
 }
 
-const SvgToDataUri: React.FC = () => {
+const SVGToDataURI: React.FC = () => {
   const [svgInput, setSvgInput] = useState<string>('');
-  const [output, setOutput] = useState<string>('');
-  const [options, setOptions] = useState<ConversionOptions>({
-    encoding: 'utf8',
-    useUrlFunction: true,
+  const [results, setResults] = useState<ConversionResult>({
+    base64: '',
+    encoded: '',
+    css: '',
+    markdown: '',
   });
-  const [copied, setCopied] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isValid, setIsValid] = useState<boolean>(true);
 
-  const convertSvgToDataUri = useCallback((input: string, opts: ConversionOptions) => {
+  const convertSvg = useCallback((input: string) => {
     if (!input.trim()) {
-      setError(null);
-      return '';
+      setResults({ base64: '', encoded: '', css: '', markdown: '' });
+      setIsValid(true);
+      return;
     }
 
     try {
       // Basic validation: must contain <svg
       if (!input.toLowerCase().includes('<svg')) {
-        throw new Error('Invalid SVG: Missing <svg> tag');
+        setIsValid(false);
+        return;
       }
 
-      // Clean up the SVG (remove extra whitespace/newlines)
-      const cleanedSvg = input
-        .replace(/>\s+</g, '><')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
+      setIsValid(true);
+      const cleanSvg = input.trim();
+      
+      // Base64 logic
+      const base64Str = btoa(unescape(encodeURIComponent(cleanSvg)));
+      const base64Uri = `data:image/svg+xml;base64,${base64Str}`;
 
-      let result = '';
-      if (opts.encoding === 'base64') {
-        const base64 = btoa(unescape(encodeURIComponent(cleanedSvg)));
-        result = `data:image/svg+xml;base64,${base64}`;
-      } else {
-        // UTF-8 / URL Encoded
-        const encoded = encodeURIComponent(cleanedSvg)
-          .replace(/'/g, '%27')
-          .replace(/"/g, '%22');
-        result = `data:image/svg+xml;charset=utf-8,${encoded}`;
-      }
+      // URL Encoded logic (Optimized for CSS)
+      const encodedSvg = encodeURIComponent(cleanSvg)
+        .replace(/'/g, '%27')
+        .replace(/"/g, '%22');
+      const encodedUri = `data:image/svg+xml,${encodedSvg}`;
 
-      setError(null);
-      return opts.useUrlFunction ? `url("${result}")` : result;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to convert SVG');
-      return '';
+      setResults({
+        base64: base64Uri,
+        encoded: encodedUri,
+        css: `background-image: url("${encodedUri}");`,
+        markdown: `![SVG](${encodedUri})`,
+      });
+    } catch (error) {
+      setIsValid(false);
     }
   }, []);
 
   useEffect(() => {
-    setOutput(convertSvgToDataUri(svgInput, options));
-  }, [svgInput, options, convertSvgToDataUri]);
+    const timeoutId = setTimeout(() => {
+      convertSvg(svgInput);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [svgInput, convertSvg]);
 
-  const handleCopy = async () => {
-    if (!output) return;
+  const copyToClipboard = async (text: string, key: string) => {
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(output);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
     } catch (err) {
-      console.error('Failed to copy', err);
+      console.error('Failed to copy!', err);
     }
   };
 
   const clearInput = () => {
     setSvgInput('');
-    setError(null);
+    setResults({ base64: '', encoded: '', css: '', markdown: '' });
   };
 
+  const downloadUri = () => {
+    if (!results.base64) return;
+    const link = document.createElement('a');
+    link.href = results.base64;
+    link.download = 'icon.svg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const OutputField = ({ label, value, id }: { label: string; value: string; id: string }) => (
+    <div className="group relative flex flex-col space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-medium uppercase tracking-widest text-zinc-500">{label}</label>
+        <button
+          onClick={() => copyToClipboard(value, id)}
+          className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 transition-colors hover:text-indigo-300"
+        >
+          {copiedKey === id ? (
+            <>
+              <Check size={14} /> Copied
+            </>
+          ) : (
+            <>
+              <Copy size={14} /> Copy
+            </>
+          )}
+        </button>
+      </div>
+      <div className="relative">
+        <textarea
+          readOnly
+          value={value}
+          className="h-20 w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 font-mono text-sm text-zinc-300 outline-none transition-all focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50"
+          placeholder="Output will appear here..."
+        />
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-zinc-950 p-6 text-zinc-200 selection:bg-indigo-500/30 sm:p-12">
+      <div className="mx-auto max-w-6xl">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-indigo-500/10 rounded-lg">
-                <Zap className="w-6 h-6 text-indigo-400" />
+        <header className="mb-12 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
+                <Zap size={18} className="text-white" />
               </div>
-              <h1 className="text-3xl font-bold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-                SVG to Data URI
-              </h1>
+              <span className="text-sm font-semibold uppercase tracking-tighter text-indigo-500">Utility Engine</span>
             </div>
-            <p className="text-slate-400 text-sm">Convert your vector graphics into CSS-ready data strings instantly.</p>
+            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              SVG to <span className="text-indigo-500 font-extrabold italic">Data URI</span>
+            </h1>
+            <p className="mt-3 max-w-md text-zinc-400">
+              Transform raw SVG vectors into production-ready Data URIs and CSS background codes instantly.
+            </p>
           </div>
           
-          <div className="flex items-center gap-3 bg-slate-900/50 p-1 border border-slate-800 rounded-xl">
-            <button
-              onClick={() => setOptions({ ...options, encoding: 'utf8' })}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                options.encoding === 'utf8' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'
-              }`}
+          <div className="flex items-center gap-3">
+             <button
+              onClick={clearInput}
+              className="flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-5 py-2.5 text-sm font-medium transition-all hover:bg-zinc-800 hover:text-red-400"
             >
-              UTF-8 (Smaller)
+              <Trash2 size={16} /> Clear
             </button>
             <button
-              onClick={() => setOptions({ ...options, encoding: 'base64' })}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                options.encoding === 'base64' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'
-              }`}
+              disabled={!results.base64}
+              onClick={downloadUri}
+              className="flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-500 hover:shadow-indigo-600/40 disabled:opacity-50"
             >
-              Base64
+              <Download size={16} /> Download
             </button>
           </div>
         </header>
 
-        <main className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Input Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
-                <FileCode className="w-4 h-4 text-indigo-400" />
-                Paste SVG Code
-              </label>
-              <button 
-                onClick={clearInput}
-                className="text-xs text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors"
-              >
-                <Trash2 className="w-3 h-3" />
-                Clear
-              </button>
-            </div>
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Left Column: Input & Preview */}
+          <div className="space-y-6">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                  <Code size={14} /> Paste SVG Source
+                </label>
+                {!isValid && (
+                  <span className="text-xs font-bold text-red-500 animate-pulse">Invalid SVG Format</span>
+                )}
+              </div>
               <textarea
                 value={svgInput}
                 onChange={(e) => setSvgInput(e.target.value)}
-                placeholder="<svg ...> ... </svg>"
-                className="relative w-full h-[400px] bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-sm font-mono text-indigo-300 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all resize-none"
+                placeholder='<svg width="100" height="100">...</svg>'
+                className={`h-80 w-full resize-none rounded-2xl border bg-zinc-900/30 p-5 font-mono text-sm transition-all focus:outline-none focus:ring-2 ${
+                  !isValid ? 'border-red-500/50 focus:ring-red-500/20' : 'border-zinc-800 focus:border-indigo-500/50 focus:ring-indigo-500/20'
+                }`}
               />
             </div>
-          </div>
 
-          {/* Output Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
-                <Eye className="w-4 h-4 text-purple-400" />
-                Result & Preview
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/20 p-6">
+              <label className="mb-4 block text-xs font-medium uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                <ImageIcon size={14} /> Live Preview
               </label>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={options.useUrlFunction}
-                    onChange={(e) => setOptions({ ...options, useUrlFunction: e.target.checked })}
-                    className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500/50"
-                  />
-                  <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">Wrap in url()</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="flex flex-col h-[400px] gap-4">
-              {/* Output String */}
-              <div className="relative group flex-1">
-                <div className="absolute top-3 right-3 z-10">
-                  <button
-                    disabled={!output}
-                    onClick={handleCopy}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                      copied 
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' 
-                        : 'bg-slate-800 text-white hover:bg-slate-700 border border-slate-700'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copied ? 'Copied!' : 'Copy String'}
-                  </button>
-                </div>
-                <textarea
-                  readOnly
-                  value={output}
-                  placeholder="Output will appear here..."
-                  className="w-full h-full bg-slate-900/80 border border-slate-800 rounded-2xl p-6 pt-14 text-sm font-mono text-slate-300 placeholder:text-slate-600 focus:outline-none transition-all resize-none"
-                />
-              </div>
-
-              {/* Live Preview */}
-              <div className="h-32 bg-slate-900/40 border border-slate-800/50 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group">
-                <div className="absolute top-2 left-3 text-[10px] uppercase tracking-widest text-slate-600 font-bold">Preview</div>
-                {output && !error ? (
+              <div className="flex h-40 w-full items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/50 transition-all group overflow-hidden">
+                {svgInput && isValid ? (
                   <div 
-                    className="w-20 h-20 bg-contain bg-center bg-no-repeat transition-transform group-hover:scale-110 duration-500"
-                    style={{ backgroundImage: options.useUrlFunction ? output : `url("${output}")` }}
+                    className="max-h-full max-w-full p-4 transition-transform group-hover:scale-110"
+                    dangerouslySetInnerHTML={{ __html: svgInput }} 
                   />
                 ) : (
-                  <div className="flex flex-col items-center gap-2 text-slate-600">
-                    <Info className="w-5 h-5 opacity-20" />
-                    <span className="text-xs font-medium">Visual preview</span>
+                  <div className="text-center">
+                    <ImageIcon size={32} className="mx-auto mb-2 text-zinc-700" />
+                    <p className="text-xs text-zinc-600 uppercase tracking-wider">Awaiting valid input</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </main>
 
-        {/* Error Messaging */}
-        {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl animate-in fade-in slide-in-from-top-2">
-            <p className="text-red-400 text-sm font-medium flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              {error}
-            </p>
-          </div>
-        )}
+          {/* Right Column: Outputs */}
+          <div className="flex flex-col space-y-6 rounded-3xl border border-zinc-800 bg-zinc-900/10 p-2 sm:p-6 backdrop-blur-sm">
+             <div className="flex items-center gap-2 px-2 pb-2">
+               <ExternalLink size={18} className="text-indigo-500" />
+               <h2 className="text-lg font-semibold text-white">Generated Formats</h2>
+             </div>
+             
+             <div className="space-y-5">
+                <OutputField label="Data URI (Base64)" value={results.base64} id="base64" />
+                <OutputField label="Data URI (URL Encoded)" value={results.encoded} id="encoded" />
+                <OutputField label="CSS Background Image" value={results.css} id="css" />
+                <OutputField label="Markdown" value={results.markdown} id="markdown" />
+             </div>
 
-        {/* Footer/Info Card */}
-        <footer className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-slate-800/60">
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-white">Why use UTF-8?</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              UTF-8 encoding is typically 30% smaller than Base64 for SVGs and remains human-readable. Perfect for CSS-in-JS.
-            </p>
+             <div className="mt-4 rounded-xl bg-indigo-500/5 p-4 border border-indigo-500/10">
+               <p className="text-xs leading-relaxed text-zinc-500">
+                 <strong className="text-zinc-300">Pro Tip:</strong> URL Encoded URIs are generally more performant and smaller than Base64 for SVGs when used in CSS files as they compress better.
+               </p>
+             </div>
           </div>
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-white">Ready for CSS</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Use the result directly in <code className="text-indigo-400 bg-indigo-500/10 px-1 rounded">background-image</code> or <code className="text-indigo-400 bg-indigo-500/10 px-1 rounded">mask-image</code> properties.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-white">Privacy First</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Processing is done entirely in your browser. Your SVG data never leaves your machine.
-            </p>
-          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-16 border-t border-zinc-900 pt-8 text-center">
+          <p className="text-xs text-zinc-600">
+            Secure, client-side only processing. No data is sent to any server.
+          </p>
         </footer>
       </div>
+      
+      <style jsx global>{`
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #27272a;
+          border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #3f3f46;
+        }
+      `}</style>
     </div>
   );
 };
 
-export default SvgToDataUri;
+export default SVGToDataURI;
