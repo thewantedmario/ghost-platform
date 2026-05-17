@@ -3,266 +3,225 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Check, Trash2, FileCode, Zap, Image as ImageIcon, ExternalLink, RefreshCw } from 'lucide-react';
+import { Copy, Check, Trash2, Image as ImageIcon, Code, Zap, ExternalLink } from 'lucide-react';
 
-type ConversionMode = 'base64' | 'encodeURIComponent' | 'mini';
-
-interface ConversionResult {
-  dataUri: string;
-  cssUrl: string;
-  imgTag: string;
+interface ConversionOptions {
+  useBase64: boolean;
+  includeDimensions: boolean;
 }
 
-const SAMPLE_SVG = `<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="50" cy="50" r="40" stroke="indigo" stroke-width="4" fill="purple" />
-  <path d="M30 50 L70 50 M50 30 L50 70" stroke="white" stroke-width="4" stroke-linecap="round" />
-</svg>`;
+const SVGToDataURI: React.FC = () => {
+  const [input, setInput] = useState<string>('');
+  const [output, setOutput] = useState<string>('');
+  const [copied, setCopied] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [options, setOptions] = useState<ConversionOptions>({
+    useBase64: false,
+    includeDimensions: true,
+  });
 
-export default function SvgToDataUri() {
-  const [svgInput, setSvgInput] = useState<string>('');
-  const [mode, setMode] = useState<ConversionMode>('base64');
-  const [results, setResults] = useState<ConversionResult>({ dataUri: '', cssUrl: '', imgTag: '' });
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-
-  const encodeSvg = useCallback((svg: string, conversionMode: ConversionMode): string => {
-    if (!svg.trim()) return '';
-    
-    // Clean up the SVG
-    const cleaned = svg.replace(/>\s+</g, '><').trim();
-
-    if (conversionMode === 'base64') {
-      try {
-        const base64 = btoa(unescape(encodeURIComponent(cleaned)));
-        return `data:image/svg+xml;base64,${base64}`;
-      } catch (e) {
-        return 'Invalid SVG for Base64 conversion';
+  const convertToDataUri = useCallback((svgString: string, useBase64: boolean) => {
+    try {
+      if (!svgString.trim()) {
+        setOutput('');
+        setError(null);
+        return;
       }
-    }
 
-    if (conversionMode === 'mini') {
-      // Optimized for CSS usage
-      const encoded = cleaned
-        .replace(/"/g, "'")
-        .replace(/%/g, '%25')
-        .replace(/#/g, '%23')
-        .replace(/{/g, '%7B')
-        .replace(/}/g, '%7D')
-        .replace(/</g, '%3C')
-        .replace(/>/g, '%3E')
-        .replace(/\s+/g, ' ');
-      return `data:image/svg+xml,${encoded}`;
-    }
+      // Basic validation
+      if (!svgString.includes('<svg')) {
+        setError('Invalid SVG format');
+        return;
+      }
 
-    // Default URI Encoding
-    return `data:image/svg+xml;utf8,${encodeURIComponent(cleaned)}`;
+      setError(null);
+      let processedSvg = svgString.trim();
+
+      if (useBase64) {
+        const base64 = btoa(unescape(encodeURIComponent(processedSvg)));
+        setOutput(`data:image/svg+xml;base64,${base64}`);
+      } else {
+        // Optimized URL encoding for SVGs
+        const encoded = encodeURIComponent(processedSvg)
+          .replace(/%20/g, ' ')
+          .replace(/%3D/g, '=')
+          .replace(/%3A/g, ':')
+          .replace(/%2F/g, '/')
+          .replace(/%22/g, "'");
+        setOutput(`data:image/svg+xml,${encoded}`);
+      }
+    } catch (err) {
+      setError('Failed to process SVG. Check your syntax.');
+    }
   }, []);
 
   useEffect(() => {
-    const dataUri = encodeSvg(svgInput, mode);
-    setResults({
-      dataUri,
-      cssUrl: dataUri ? `background-image: url("${dataUri}");` : '',
-      imgTag: dataUri ? `<img src="${dataUri}" alt="Converted SVG" />` : '',
-    });
-  }, [svgInput, mode, encodeSvg]);
+    convertToDataUri(input, options.useBase64);
+  }, [input, options.useBase64, convertToDataUri]);
 
-  const copyToClipboard = async (text: string, key: string) => {
-    if (!text) return;
-    await navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+  const handleCopy = async () => {
+    if (!output) return;
+    await navigator.clipboard.writeText(output);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleClear = () => {
-    setSvgInput('');
-  };
-
-  const loadSample = () => {
-    setSvgInput(SAMPLE_SVG);
+    setInput('');
+    setOutput('');
+    setError(null);
   };
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-200 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-[#030303] text-slate-200 p-6 md:p-12 font-sans selection:bg-indigo-500/30">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <header className="mb-10 text-center">
-          <div className="inline-flex items-center justify-center p-2 mb-4 rounded-2xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-            <Zap className="w-6 h-6 text-indigo-400" />
+        <header className="mb-12 space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-indigo-600 rounded-lg shadow-[0_0_20px_rgba(79,70,229,0.4)]">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-4xl font-bold tracking-tight text-white">
+              SVG <span className="text-indigo-500">to</span> Data URI
+            </h1>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-slate-400 tracking-tight mb-3">
-            SVG to Data URI
-          </h1>
-          <p className="text-slate-400 max-w-lg mx-auto text-lg">
-            Convert your SVG code into ultra-fast Data URIs for CSS and HTML.
+          <p className="text-slate-400 max-w-2xl text-lg">
+            Convert your SVG vectors into high-performance, browser-ready Data URIs for CSS backgrounds or inline HTML.
           </p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column: Input */}
+          {/* Input Section */}
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between px-1">
-              <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <FileCode className="w-4 h-4 text-indigo-400" />
-                Input SVG Code
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
+                <Code className="w-4 h-4 text-indigo-400" />
+                Raw SVG Code
               </label>
-              <div className="flex gap-2">
-                <button 
-                  onClick={loadSample}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
-                >
-                  Load Sample
-                </button>
-                <button 
-                  onClick={handleClear}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors border border-red-500/20 flex items-center gap-1"
-                >
-                  <Trash2 className="w-3 h-3" /> Clear
-                </button>
-              </div>
+              <button 
+                onClick={handleClear}
+                className="text-xs text-slate-500 hover:text-red-400 transition-colors flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                Clear
+              </button>
             </div>
-            
             <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
               <textarea
-                value={svgInput}
-                onChange={(e) => setSvgInput(e.target.value)}
-                placeholder="Paste your SVG code here (e.g., <svg>...</svg>)"
-                className="relative w-full h-[450px] bg-[#0f172a] border border-slate-800 rounded-2xl p-5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all resize-none placeholder:text-slate-600 leading-relaxed"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder='<svg xmlns="http://www.w3.org/2000/svg" ...'
+                className="relative w-full h-[400px] bg-[#0c0c0e] border border-white/10 rounded-xl p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all resize-none placeholder:text-slate-700"
               />
             </div>
           </div>
 
-          {/* Right Column: Output */}
-          <div className="flex flex-col gap-6">
-            {/* Mode Selector */}
-            <div className="bg-slate-900/50 border border-slate-800 p-1.5 rounded-xl flex items-center gap-1">
-              {[
-                { id: 'base64', label: 'Base64' },
-                { id: 'mini', label: 'Mini SVG (Optimized)' },
-                { id: 'encodeURIComponent', label: 'URI Encoded' },
-              ].map((opt) => (
+          {/* Output Section */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
+                <ExternalLink className="w-4 h-4 text-emerald-400" />
+                Data URI Result
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className="hidden" 
+                    checked={options.useBase64}
+                    onChange={(e) => setOptions({...options, useBase64: e.target.checked})}
+                  />
+                  <div className={`w-8 h-4 rounded-full transition-colors relative ${options.useBase64 ? 'bg-indigo-600' : 'bg-slate-700'}`}>
+                    <div className={`absolute top-1 w-2 h-2 bg-white rounded-full transition-transform ${options.useBase64 ? 'left-5' : 'left-1'}`} />
+                  </div>
+                  <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors">Base64</span>
+                </label>
+              </div>
+            </div>
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-indigo-600 rounded-xl blur opacity-10 group-focus-within:opacity-25 transition duration-500"></div>
+              <div className="relative">
+                <textarea
+                  readOnly
+                  value={output}
+                  placeholder="The encoded URI will appear here..."
+                  className="w-full h-[400px] bg-[#0c0c0e] border border-white/10 rounded-xl p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all resize-none text-emerald-400/90 placeholder:text-slate-700"
+                />
                 <button
-                  key={opt.id}
-                  onClick={() => setMode(opt.id as ConversionMode)}
-                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                    mode === opt.id 
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  onClick={handleCopy}
+                  disabled={!output}
+                  className={`absolute bottom-4 right-4 flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold transition-all active:scale-95 ${
+                    copied 
+                    ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] disabled:opacity-50 disabled:shadow-none'
                   }`}
                 >
-                  {opt.label}
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy URI
+                    </>
+                  )}
                 </button>
-              ))}
-            </div>
-
-            {/* Output Cards */}
-            <div className="space-y-4">
-              <OutputCard 
-                title="Data URI" 
-                value={results.dataUri} 
-                onCopy={() => copyToClipboard(results.dataUri, 'uri')}
-                isCopied={copiedKey === 'uri'}
-              />
-              <OutputCard 
-                title="CSS Background" 
-                value={results.cssUrl} 
-                onCopy={() => copyToClipboard(results.cssUrl, 'css')}
-                isCopied={copiedKey === 'css'}
-              />
-              <OutputCard 
-                title="HTML Image Tag" 
-                value={results.imgTag} 
-                onCopy={() => copyToClipboard(results.imgTag, 'img')}
-                isCopied={copiedKey === 'img'}
-              />
-            </div>
-
-            {/* Preview Area */}
-            <div className="flex-1 min-h-[140px] bg-slate-900/30 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center relative overflow-hidden group">
-              <div className="absolute top-4 left-4 flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-slate-500">
-                <ImageIcon className="w-3 h-3" />
-                Live Preview
               </div>
-              {svgInput ? (
-                <div 
-                  className="max-w-full max-h-full transition-transform duration-500 hover:scale-110"
-                  dangerouslySetInnerHTML={{ __html: svgInput }} 
-                />
-              ) : (
-                <div className="text-slate-600 text-sm flex flex-col items-center gap-2">
-                  <RefreshCw className="w-5 h-5 animate-spin-slow opacity-20" />
-                  Waiting for input...
-                </div>
-              )}
-              {/* Checkerboard Pattern for transparent SVGs */}
-              <div className="absolute inset-0 -z-10 opacity-[0.03] pointer-events-none" 
-                   style={{ backgroundImage: 'conic-gradient(#fff 90deg, transparent 90deg 180deg, #fff 180deg 270deg, transparent 270deg)', backgroundSize: '20px 20px' }} 
-              />
             </div>
           </div>
         </div>
 
-        {/* Footer Info */}
-        <footer className="mt-16 pt-8 border-t border-slate-900 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-sm">
-          <div className="flex items-center gap-6">
-            <span className="flex items-center gap-1.5"><ExternalLink className="w-3.5 h-3.5" /> High Performance</span>
-            <span className="flex items-center gap-1.5"><ExternalLink className="w-3.5 h-3.5" /> Client-side Secure</span>
-            <span className="flex items-center gap-1.5"><ExternalLink className="w-3.5 h-3.5" /> Cross-browser Ready</span>
-          </div>
-          <p>© {new Date().getFullYear()} SVG Foundry. Professional Developer Tools.</p>
-        </footer>
-      </div>
+        {/* Preview Section */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-[#0c0c0e] border border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center min-h-[240px] relative overflow-hidden group">
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+                <div className="absolute top-4 left-4 flex items-center gap-2 text-xs font-medium text-slate-500 uppercase tracking-widest">
+                    <ImageIcon className="w-3 h-3" />
+                    Visual Preview
+                </div>
+                {output ? (
+                    <div className="relative z-10 p-8 bg-white/5 rounded-xl backdrop-blur-sm border border-white/5">
+                        <img 
+                            src={output} 
+                            alt="SVG Preview" 
+                            className="max-h-32 max-w-full object-contain"
+                        />
+                    </div>
+                ) : (
+                    <div className="text-slate-600 italic text-sm">Waiting for valid SVG input...</div>
+                )}
+            </div>
 
-      <style jsx global>{`
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin-slow {
-          animation: spin-slow 8s linear infinite;
-        }
-      `}</style>
-    </div>
-  );
-}
-
-interface OutputCardProps {
-  title: string;
-  value: string;
-  onCopy: () => void;
-  isCopied: boolean;
-}
-
-function OutputCard({ title, value, onCopy, isCopied }: OutputCardProps) {
-  return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 transition-all hover:border-slate-700">
-      <div className="flex justify-between items-center mb-2.5">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{title}</h3>
-        <button
-          onClick={onCopy}
-          disabled={!value}
-          className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-            isCopied 
-              ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20' 
-              : 'bg-white/5 text-slate-300 hover:bg-indigo-500/10 hover:text-indigo-400'
-          } disabled:opacity-30 disabled:cursor-not-allowed`}
-        >
-          {isCopied ? (
-            <>
-              <Check className="w-3 h-3" /> Copied
-            </>
-          ) : (
-            <>
-              <Copy className="w-3 h-3" /> Copy
-            </>
-          )}
-        </button>
-      </div>
-      <div className="relative group">
-        <div className="w-full bg-black/40 rounded-lg p-3 text-[13px] font-mono text-indigo-300/90 break-all line-clamp-2 min-h-[3.5rem] border border-white/5">
-          {value || <span className="text-slate-700 italic">Empty output...</span>}
+            <div className="bg-[#0c0c0e] border border-white/10 rounded-2xl p-8 space-y-4">
+                <div className="flex items-center gap-2 text-xs font-medium text-slate-500 uppercase tracking-widest">
+                    <Code className="w-3 h-3" />
+                    CSS Usage Example
+                </div>
+                <div className="bg-black/40 rounded-lg p-4 font-mono text-xs text-slate-400 overflow-x-auto border border-white/5">
+                    <span className="text-purple-400">.element</span> {'{'} <br />
+                    &nbsp;&nbsp;<span className="text-indigo-400">background-image</span>: <span className="text-amber-200">url("{output || '...'}")</span>;<br />
+                    &nbsp;&nbsp;<span className="text-indigo-400">background-repeat</span>: no-repeat;<br />
+                    {'}'}
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Tip: Use URL encoding (non-Base64) for smaller file sizes and better gzip compression. Base64 is useful for embedding in environments that don't support special characters.
+                </p>
+            </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );
-}
+};
+
+export default SVGToDataURI;
